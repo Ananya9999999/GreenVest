@@ -1,0 +1,81 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --olive-950: #171e11;
+  --olive-900: #2e3923;
+  --olive-700: #41522e;
+  --olive-500: #6b8449;
+  --cream-50: #fdfbf7;
+  --cream-100: #f9f4eb;
+  --cream-200: #f2e8d5;
+  --brown-600: #8c6150;
+  --brown-500: #9a735c;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--cream-50);
+  color: var(--olive-950);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Smooth page transitions */
+.page-enter {
+  animation: fadeUp 0.5s ease-out both;
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #f2e8d5;
+}
+::-webkit-scrollbar-thumb {
+  background: #a8bc8a;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #6b8449;
+}
+
+/* Focus ring */
+*:focus-visible {
+  outline: 2px solid #6b8449;
+  outline-offset: 2px;
+}
+
+/* Card hover lift */
+.card-lift {
+  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.card-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 40px -12px rgba(46, 57, 35, 0.15);
+}
+
+/* Gradient mesh background */
+.mesh-bg {
+  background-color: #fdfbf7;
+  background-image:
+    radial-gradient(at 20% 20%, rgba(168, 188, 138, 0.25) 0px, transparent 50%),
+    radial-gradient(at 80% 10%, rgba(201, 165, 110, 0.2) 0px, transparent 45%),
+    radial-gradient(at 50% 80%, rgba(154, 115, 92, 0.12) 0px, transparent 50%);
+}

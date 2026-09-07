@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+  <defs>
+    <linearGradient id="g" x1="20" y1="10" x2="110" y2="120" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#41522e"/>
+      <stop offset="0.55" stop-color="#6b8449"/>
+      <stop offset="1" stop-color="#8c6150"/>
+    </linearGradient>
+  </defs>
+  <!-- circle base -->
+  <circle cx="64" cy="64" r="58" fill="#2e3923"/>
+  <circle cx="64" cy="64" r="52" fill="url(#g)"/>
+  <!-- stylized leaf / V -->
+  <path d="M64 28c-2 18-18 32-28 42 12 4 22 8 28 18 6-10 16-14 28-18-10-10-26-24-28-42z" fill="#f9f4eb" opacity="0.95"/>
+  <path d="M64 48c-1 10-8 18-14 24 6 2 11 4 14 10 3-6 8-8 14-10-6-6-13-14-14-24z" fill="#2e3923" opacity="0.35"/>
+  <!-- stem -->
+  <path d="M64 70v26" stroke="#f9f4eb" stroke-width="4" stroke-linecap="round" opacity="0.9"/>
+</svg>
