@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { Splash } from "@/components/layout/Splash";
+import { AuthProvider } from "@/context/AuthContext";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [showSplash, setShowSplash] = useState(true);
@@ -14,7 +15,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <>
+    <AuthProvider>
       {showSplash && <Splash onFinish={onSplashFinish} minDurationMs={2600} />}
       <div
         className={
@@ -25,6 +26,6 @@ export function Providers({ children }: { children: React.ReactNode }) {
       >
         {children}
       </div>
-    </>
+    </AuthProvider>
   );
 }

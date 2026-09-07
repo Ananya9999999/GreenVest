@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
-import { Menu, X } from "lucide-react";
+import { Menu, X, LogOut } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/layout/Logo";
+import { useAuth } from "@/context/AuthContext";
 
 const links = [
   { href: "/", label: "Home" },
@@ -19,6 +20,7 @@ const links = [
 export function Navbar() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const { user, logout } = useAuth();
 
   return (
     <motion.header
@@ -55,12 +57,41 @@ export function Navbar() {
           })}
         </nav>
 
-        <div className="hidden md:block">
+        <div className="hidden md:flex items-center gap-3">
+          {user ? (
+            <div className="flex items-center gap-2">
+              <Link
+                href="/dashboard"
+                className="flex items-center gap-2 rounded-full border border-olive-200 bg-olive-50 px-3 py-1.5 text-xs font-semibold text-olive-900 transition hover:bg-olive-100"
+              >
+                <span className="font-mono text-olive-800">@{user.user_id}</span>
+                <span className="rounded-full bg-olive-800 px-2 py-0.5 text-[10px] font-bold text-white">
+                  {user.credit_score}
+                </span>
+              </Link>
+              <button
+                type="button"
+                onClick={logout}
+                title="Sign Out"
+                className="rounded-full p-2 text-olive-600 hover:bg-cream-200/60 hover:text-olive-900 transition"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
+            </div>
+          ) : (
+            <Link
+              href="/auth"
+              className="rounded-full border border-olive-800 px-4 py-1.5 text-xs font-semibold text-olive-900 transition hover:bg-olive-800 hover:text-cream-50"
+            >
+              Sign In
+            </Link>
+          )}
+
           <Link
             href="/discover"
-            className="rounded-full bg-olive-800 px-4 py-2 text-sm font-medium text-cream-50 transition hover:bg-olive-700 active:scale-[0.98]"
+            className="rounded-full bg-olive-800 px-4 py-2 text-xs font-semibold text-cream-50 transition hover:bg-olive-700 active:scale-[0.98]"
           >
-            Get started
+            Analyze Land
           </Link>
         </div>
 

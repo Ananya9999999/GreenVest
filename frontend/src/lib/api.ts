@@ -5,6 +5,10 @@ import type {
   WhatIfRequest,
   WhatIfResult,
   SatelliteMonitoringData,
+  UserProfile,
+  RealMarketplaceLand,
+  DirectMessage,
+  SubscriptionResponse,
 } from "@/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -392,3 +396,202 @@ export async function fetchSatelliteData(landId: string = "GV-2026-001"): Promis
     };
   }
 }
+
+// ------------------- Authentication & User Profile -------------------
+
+export async function registerUser(payload: {
+  user_id: string;
+  name: string;
+  email: string;
+  password: string;
+  user_type: string;
+  verified_area_ha?: number;
+  budget_inr?: number;
+}): Promise<UserProfile> {
+  const res = await fetch(`${API_BASE}/api/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Registration failed" }));
+    throw new Error(err.detail || "Registration failed");
+  }
+  return await res.json();
+}
+
+export async function loginUser(payload: {
+  email_or_user_id: string;
+  password: string;
+}): Promise<UserProfile> {
+  const res = await fetch(`${API_BASE}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Login failed" }));
+    throw new Error(err.detail || "Invalid credentials");
+  }
+  return await res.json();
+}
+
+export async function getUserProfile(userId: string): Promise<UserProfile> {
+  const res = await fetch(`${API_BASE}/api/auth/user/${userId.replace(/^@/, "")}`);
+  if (!res.ok) throw new Error(`User @${userId} not found`);
+  return await res.json();
+}
+
+// ------------------- Marketplace Lands -------------------
+
+export async function fetchMarketplaceLands(): Promise<RealMarketplaceLand[]> {
+  try {
+    const res = await fetch(`${API_BASE}/api/marketplace/lands`);
+    if (!res.ok) throw new Error("Failed to fetch lands");
+    return await res.json();
+  } catch (err) {
+    console.warn("Using fallback marketplace listings:", err);
+    return [
+      {
+        land_id: "LAND-MH-84210",
+        owner_user_id: "nashik_organic_agro",
+        owner_name: "Nashik Agro Holdings",
+        owner_credit_score: 840,
+        owner_credit_tier: "Prime Green A+",
+        title: "Prime Deccan Black Soil Agroforestry Holding",
+        location: "Nashik, MH",
+        area_hectares: 12.5,
+        soil_type: "Black soil",
+        water_availability: "Moderate (Borewell & Aquifer)",
+        asking_price_inr: 5250000.0,
+        land_health_score: 84,
+        carbon_potential: 9.2,
+        status: "active",
+        created_at: "2026-03-01",
+      },
+      {
+        land_id: "LAND-TN-39102",
+        owner_user_id: "coimbatore_orchards",
+        owner_name: "Coimbatore Eco Orchards",
+        owner_credit_score: 780,
+        owner_credit_tier: "Tier 1 Sustainable Sponsor",
+        title: "Western Ghats Foothills Red Loam Holding",
+        location: "Coimbatore, TN",
+        area_hectares: 8.0,
+        soil_type: "Red loam",
+        water_availability: "Moderate (Seasonal Rain & Well)",
+        asking_price_inr: 3040000.0,
+        land_health_score: 76,
+        carbon_potential: 7.8,
+        status: "active",
+        created_at: "2026-03-02",
+      },
+      {
+        land_id: "LAND-MH-93114",
+        owner_user_id: "deccan_timber_trust",
+        owner_name: "Deccan Timber Trust",
+        owner_credit_score: 880,
+        owner_credit_tier: "Prime Green A+",
+        title: "Riverine High-Percolation Alluvial Land",
+        location: "Pune rural, MH",
+        area_hectares: 20.0,
+        soil_type: "Alluvial",
+        water_availability: "Abundant (Canal & High Water Table)",
+        asking_price_inr: 10200000.0,
+        land_health_score: 88,
+        carbon_potential: 9.5,
+        status: "active",
+        created_at: "2026-03-03",
+      },
+      {
+        land_id: "LAND-KA-48120",
+        owner_user_id: "deccan_timber_trust",
+        owner_name: "Deccan Timber Trust",
+        owner_credit_score: 880,
+        owner_credit_tier: "Prime Green A+",
+        title: "Mysuru Sub-Tropical Agro-Ecological Plot",
+        location: "Mysuru, KA",
+        area_hectares: 6.2,
+        soil_type: "Sandy loam",
+        water_availability: "Rainfed / Constrained",
+        asking_price_inr: 1984000.0,
+        land_health_score: 71,
+        carbon_potential: 6.5,
+        status: "active",
+        created_at: "2026-03-04",
+      },
+    ];
+  }
+}
+
+export async function createMarketplaceLand(payload: {
+  owner_user_id: string;
+  title: string;
+  location: string;
+  area_hectares: number;
+  soil_type: string;
+  water_availability: string;
+  asking_price_inr: number;
+}): Promise<RealMarketplaceLand> {
+  const res = await fetch(`${API_BASE}/api/marketplace/lands`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Listing creation failed" }));
+    throw new Error(err.detail || "Failed to create land listing");
+  }
+  return await res.json();
+}
+
+// ------------------- Subscriptions -------------------
+
+export async function subscribeToPlan(payload: {
+  user_id: string;
+  plan_type: "landowner_listing" | "corporate_access";
+  amount_paid: number;
+}): Promise<SubscriptionResponse> {
+  const res = await fetch(`${API_BASE}/api/subscription/subscribe`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Subscription failed" }));
+    throw new Error(err.detail || "Subscription failed");
+  }
+  return await res.json();
+}
+
+// ------------------- Direct User-to-User Messaging -------------------
+
+export async function fetchUserMessages(userId: string): Promise<DirectMessage[]> {
+  try {
+    const res = await fetch(`${API_BASE}/api/messages/${userId.replace(/^@/, "")}`);
+    if (!res.ok) throw new Error("Failed to fetch messages");
+    return await res.json();
+  } catch (err) {
+    console.warn("Using fallback messages:", err);
+    return [];
+  }
+}
+
+export async function postDirectMessage(payload: {
+  sender_user_id: string;
+  recipient_user_id: string;
+  content: string;
+  land_id?: string;
+}): Promise<DirectMessage> {
+  const res = await fetch(`${API_BASE}/api/messages`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Failed to send message" }));
+    throw new Error(err.detail || "Failed to send message");
+  }
+  return await res.json();
+}
+

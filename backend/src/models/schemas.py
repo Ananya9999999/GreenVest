@@ -228,3 +228,101 @@ class ChatMessageRequest(BaseModel):
 
 class ChatMessageResponse(BaseModel):
     reply: str
+
+
+# ------------------- Auth, Credit, Subscription & Messaging Schemas -------------------
+
+class UserRegisterRequest(BaseModel):
+    user_id: str
+    name: str
+    email: str
+    password: str
+    user_type: str = "landowner"  # 'landowner' | 'corporate' | 'individual'
+    verified_area_ha: float = 0.0
+    budget_inr: float = 500000.0
+
+
+class UserLoginRequest(BaseModel):
+    email_or_user_id: str
+    password: str
+
+
+class CreditFactorItem(BaseModel):
+    name: str
+    points: int
+    max_points: int
+    description: str
+
+
+class UserProfileResponse(BaseModel):
+    user_id: str
+    name: str
+    email: str
+    user_type: str
+    credit_score: int
+    credit_tier: str
+    credit_factors: List[CreditFactorItem]
+    subscription_tier: str
+    verified_area_ha: float
+    budget_inr: float
+    created_at: str
+
+
+class MarketplaceLandItem(BaseModel):
+    land_id: str
+    owner_user_id: str
+    owner_name: Optional[str] = None
+    owner_credit_score: Optional[int] = None
+    owner_credit_tier: Optional[str] = None
+    title: str
+    location: str
+    area_hectares: float
+    soil_type: str
+    water_availability: str
+    asking_price_inr: float
+    land_health_score: int
+    carbon_potential: float
+    status: str = "active"
+    created_at: str
+
+
+class CreateLandRequest(BaseModel):
+    owner_user_id: str
+    title: str
+    location: str
+    area_hectares: float
+    soil_type: str = "Black soil"
+    water_availability: str = "Moderate"
+    asking_price_inr: float = 2500000.0
+
+
+class SubscriptionRequest(BaseModel):
+    user_id: str
+    plan_type: str  # 'landowner_listing' | 'corporate_access'
+    amount_paid: float
+
+
+class SubscriptionResponse(BaseModel):
+    user_id: str
+    subscription_tier: str
+    credit_score: int
+    credit_tier: str
+    message: str
+
+
+class SendMessageRequest(BaseModel):
+    sender_user_id: str
+    recipient_user_id: str
+    content: str
+    land_id: Optional[str] = None
+
+
+class DirectMessageItem(BaseModel):
+    id: int
+    sender_user_id: str
+    recipient_user_id: str
+    land_id: Optional[str] = None
+    content: str
+    created_at: str
+    is_read: int = 0
+

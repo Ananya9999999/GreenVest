@@ -239,3 +239,61 @@ export type MarketplaceListing = {
   soilType: string;
   priceHint?: string;
 };
+
+export type CreditFactorItem = {
+  name: string;
+  points: number;
+  max_points: number;
+  description: string;
+};
+
+export type UserProfile = {
+  user_id: string;
+  name: string;
+  email: string;
+  user_type: "landowner" | "corporate" | "individual";
+  credit_score: number;
+  credit_tier: string;
+  credit_factors: CreditFactorItem[];
+  subscription_tier: "free" | "landowner_listing" | "corporate_access";
+  verified_area_ha: number;
+  budget_inr: number;
+  created_at: string;
+};
+
+export type RealMarketplaceLand = {
+  land_id: string;
+  owner_user_id: string;
+  owner_name?: string;
+  owner_credit_score?: number;
+  owner_credit_tier?: string;
+  title: string;
+  location: string;
+  area_hectares: number;
+  soil_type: string;
+  water_availability: string;
+  asking_price_inr: number;
+  land_health_score: number;
+  carbon_potential: number;
+  status: string;
+  created_at: string;
+};
+
+export type DirectMessage = {
+  id: number;
+  sender_user_id: string;
+  recipient_user_id: string;
+  land_id?: string;
+  content: string;
+  created_at: string;
+  is_read: number;
+};
+
+export type SubscriptionResponse = {
+  user_id: string;
+  subscription_tier: string;
+  credit_score: number;
+  credit_tier: string;
+  message: string;
+};
+
