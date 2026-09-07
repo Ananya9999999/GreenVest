@@ -74,7 +74,7 @@ export default function MarketplacePage() {
               </div>
 
               <Link
-                href="/analyze"
+                href={`/analyze?location=${encodeURIComponent(item.location)}&area=${item.areaHectares}&soil=${encodeURIComponent(item.soilType)}`}
                 className="mt-5 block rounded-xl bg-olive-800 py-2.5 text-center text-sm font-medium text-cream-50 transition group-hover:bg-olive-700"
               >
                 Analyze this land
