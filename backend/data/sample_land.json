@@ -1,0 +1,14 @@
+{
+  "land_id": "GV-2026-001",
+  "location": "Nashik, Maharashtra",
+  "area_hectares": 12.5,
+  "budget": 500000,
+  "investment_horizon_years": 15,
+  "health_score": 82,
+  "soil_score": 78,
+  "water_score": 70,
+  "climate_score": 85,
+  "vegetation_score": 75,
+  "terrain_score": 80,
+  "climate_risk": 4.5
+}
