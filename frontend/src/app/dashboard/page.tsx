@@ -112,7 +112,7 @@ export default function DashboardPage() {
               Project Portfolio Management
             </div>
             <h1 className="mt-2 text-3xl font-bold text-olive-950 sm:text-4xl">
-              10. 📈 Long-Term Investment & Monitoring
+              Long-Term Investment & Monitoring
             </h1>
             <p className="mt-1 text-sm text-olive-700">
               Active Strategy: <strong className="text-olive-900">{stratTitle}</strong> · Location:{" "}
@@ -203,7 +203,7 @@ export default function DashboardPage() {
             }`}
           >
             <Satellite className="h-4 w-4" />
-            11. 🛰️ Satellite Remote Sensing & NDVI
+            Satellite Remote Sensing & NDVI
           </button>
         </div>
 

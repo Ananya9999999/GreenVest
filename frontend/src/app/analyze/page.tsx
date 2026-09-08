@@ -269,7 +269,7 @@ function AnalyzeContent() {
               <div className="flex items-center gap-2">
                 <Layers className="h-5 w-5 text-olive-700" />
                 <h2 className="text-lg font-bold text-olive-900">
-                  1. 🗺️ Smart Land Analysis Overview
+                  🗺️ Smart Land Analysis Overview
                 </h2>
               </div>
               <span className="rounded-full bg-olive-100 px-3 py-1 text-xs font-semibold text-olive-800">
@@ -367,7 +367,7 @@ function AnalyzeContent() {
                   </div>
                   <div>
                     <span className="inline-block rounded-full bg-olive-100 px-2.5 py-0.5 text-xs font-bold text-olive-800">
-                      2. 🟢 Signature GreenScore
+                      🟢 Signature GreenScore
                     </span>
                     <h2 className="mt-1 text-2xl font-bold text-olive-950">
                       {data.greenscore.tier}
@@ -427,7 +427,7 @@ function AnalyzeContent() {
               <div>
                 <div className="flex items-center justify-between">
                   <span className="inline-block rounded-full bg-cream-200 px-2.5 py-0.5 text-xs font-bold text-olive-900">
-                    8. 🌍 Nature Impact Score
+                    🌍 Nature Impact Score
                   </span>
                   <Leaf className="h-5 w-5 text-olive-600" />
                 </div>
@@ -537,7 +537,7 @@ function AnalyzeContent() {
           <div className="flex items-center justify-between">
             <div>
               <span className="rounded-full bg-olive-100 px-3 py-1 text-xs font-semibold text-olive-800">
-                3. 🤖 AI Plantation Strategy Generator
+                🤖 AI Plantation Strategy Generator
               </span>
               <h2 className="mt-1 text-2xl font-bold text-olive-950 sm:text-3xl">
                 Top 3 Recommended Plantation Strategies
@@ -684,7 +684,7 @@ function AnalyzeContent() {
             <div className="flex flex-wrap items-center justify-between gap-4 border-b border-olive-100 pb-4">
               <div>
                 <span className="rounded-full bg-olive-100 px-3 py-1 text-xs font-semibold text-olive-800">
-                  6. ⚖️ Strategy Comparison Engine
+                  ⚖️ Strategy Comparison Engine
                 </span>
                 <h2 className="mt-2 text-2xl font-bold text-olive-950">
                   Compare All Three Recommendations
@@ -745,7 +745,7 @@ function AnalyzeContent() {
             <div className="flex items-center justify-between border-b border-olive-100 pb-3">
               <div>
                 <span className="rounded-full bg-olive-100 px-2.5 py-0.5 text-xs font-semibold text-olive-800">
-                  4. 📊 Carbon Sequestration Forecast
+                  📊 Carbon Sequestration Forecast
                 </span>
                 <h3 className="mt-1 text-lg font-bold text-olive-950">
                   CO₂ Capture Projections (with Confidence Range)
@@ -808,7 +808,7 @@ function AnalyzeContent() {
               <div className="flex items-center justify-between border-b border-olive-100 pb-3">
                 <div>
                   <span className="rounded-full bg-olive-100 px-2.5 py-0.5 text-xs font-semibold text-olive-800">
-                    5. 💰 Investment & ROI Calculator
+                    💰 Investment & ROI Calculator
                   </span>
                   <h3 className="mt-1 text-lg font-bold text-olive-950">
                     Financial Returns: {activeStrategy.title}
@@ -881,7 +881,7 @@ function AnalyzeContent() {
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-olive-100 pb-3">
               <div>
                 <span className="rounded-full bg-olive-100 px-3 py-1 text-xs font-semibold text-olive-800">
-                  7. 🌦️ Climate & Environmental Risk Analysis
+                  🌦️ Climate & Environmental Risk Analysis
                 </span>
                 <h2 className="mt-2 text-2xl font-bold text-olive-950">
                   Multi-Hazard Threat Evaluation
@@ -936,7 +936,7 @@ function AnalyzeContent() {
           <div className="flex flex-wrap items-center justify-between gap-4 border-b border-olive-200 pb-4">
             <div>
               <span className="rounded-full bg-olive-800 px-3 py-1 text-xs font-bold text-white">
-                9. 🔄 Interactive Feature
+                🔄 What-If Scenario Simulator
               </span>
               <h2 className="mt-2 text-2xl font-black text-olive-950 sm:text-3xl">
                 &ldquo;What If?&rdquo; Scenario Simulator
