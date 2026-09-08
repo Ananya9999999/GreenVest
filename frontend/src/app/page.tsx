@@ -81,7 +81,7 @@ export default function HomePage() {
                 title: "Connect peer-to-peer",
                 desc: "Unique @userids and LandIDs. We don’t mediate deals — only matching.",
               },
-            ].map((item, i) => (
+            ].map((item) => (
               <div
                 key={item.title}
                 className="rounded-2xl border border-olive-100 bg-white/80 p-5 shadow-sm backdrop-blur"

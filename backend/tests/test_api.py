@@ -76,11 +76,13 @@ def test_satellite():
 
 
 def test_auth_and_credit_score():
-    unique_user = "test_farmer_99"
+    import time
+    ts = int(time.time() * 1000)
+    unique_user = f"test_farmer_{ts}"
     payload = {
         "user_id": unique_user,
         "name": "Test Farmer",
-        "email": "testfarmer99@greenvest.org",
+        "email": f"testfarmer_{ts}@greenvest.org",
         "password": "securepassword",
         "user_type": "landowner",
         "verified_area_ha": 14.5,

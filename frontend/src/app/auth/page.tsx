@@ -2,17 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import {
-  ShieldCheck,
   User,
   Mail,
   Lock,
-  ArrowRight,
-  Sparkles,
   Building2,
   TreePine,
-  CheckCircle2,
   AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -20,7 +16,7 @@ import { useAuth } from "@/context/AuthContext";
 
 export default function AuthPage() {
   const router = useRouter();
-  const { login, register, user } = useAuth();
+  const { login, register } = useAuth();
 
   const [mode, setMode] = useState<"login" | "register">("login");
   const [error, setError] = useState<string | null>(null);
@@ -59,8 +55,9 @@ export default function AuthPage() {
         });
       }
       router.push("/dashboard");
-    } catch (err: any) {
-      setError(err.message || "Authentication failed. Please check inputs.");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Authentication failed. Please check inputs.";
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -72,8 +69,9 @@ export default function AuthPage() {
     try {
       await login(handle, "pass123");
       router.push("/dashboard");
-    } catch (err: any) {
-      setError(err.message || "Failed quick login");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed quick login";
+      setError(msg);
     } finally {
       setLoading(false);
     }

@@ -101,7 +101,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
     const updated: UserProfile = {
       ...user,
-      subscription_tier: res.subscription_tier as any,
+      subscription_tier: res.subscription_tier as UserProfile["subscription_tier"],
       credit_score: res.credit_score,
       credit_tier: res.credit_tier,
     };
