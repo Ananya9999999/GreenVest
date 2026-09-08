@@ -3,10 +3,11 @@ FastAPI application exposing the GreenVest AI Land Intelligence and Investment E
 """
 
 from typing import Optional, Dict, Any, List
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from src.core.config import get_settings
 from src.models.schemas import (
     LandInput,
     PreferenceWeights,
@@ -22,6 +23,10 @@ from src.models.schemas import (
     CreateLandRequest,
     SubscriptionRequest,
     SubscriptionResponse,
+    CreateOrderRequest,
+    CreateOrderResponse,
+    VerifyPaymentRequest,
+    VerifyPaymentResponse,
     SendMessageRequest,
     DirectMessageItem,
 )
@@ -35,11 +40,15 @@ from src.db.database import (
     get_user_by_id,
     get_user_by_email,
     update_subscription,
+    activate_paid_subscription,
+    get_user_subscriptions,
     get_marketplace_lands,
     create_land_listing,
     send_direct_message,
     get_user_messages,
 )
+from src.services.payment_service import payment_service
+
 
 
 app = FastAPI(
@@ -215,9 +224,21 @@ def get_profile(user_id: str):
 # ------------------- Marketplace Lands -------------------
 
 @app.get("/api/marketplace/lands", response_model=List[MarketplaceLandItem])
-def list_marketplace_lands():
+def list_marketplace_lands(user_id: Optional[str] = None):
     try:
+        # Check corporate access / paid plan if user_id is provided
+        if user_id:
+            user = get_user_by_id(user_id)
+            if not user:
+                raise HTTPException(status_code=404, detail=f"User @{user_id} not found.")
+            if user["subscription_tier"] == "free":
+                raise HTTPException(
+                    status_code=403,
+                    detail="A Corporate Access Pass (₹9,999) or Landowner Listing Plan is required to load verified marketplace lands.",
+                )
         return get_marketplace_lands()
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -253,7 +274,124 @@ def create_land(req: CreateLandRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ------------------- Subscriptions -------------------
+# ------------------- Real Razorpay Payments -------------------
+
+@app.post("/api/payments/create-order", response_model=CreateOrderResponse)
+def create_payment_order(req: CreateOrderRequest):
+    try:
+        order_data = payment_service.create_order(
+            user_id=req.user_id,
+            plan_type=req.plan_type,
+            amount=req.amount,
+        )
+        return CreateOrderResponse(**order_data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/payments/verify", response_model=VerifyPaymentResponse)
+def verify_payment_checkout(req: VerifyPaymentRequest):
+    try:
+        user = get_user_by_id(req.user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail=f"User @{req.user_id} not found.")
+
+        # Cryptographically verify the signature
+        is_valid = payment_service.verify_payment_signature(
+            razorpay_order_id=req.razorpay_order_id,
+            razorpay_payment_id=req.razorpay_payment_id,
+            razorpay_signature=req.razorpay_signature,
+        )
+
+        if not is_valid:
+            from src.db.database import record_payment_event
+            record_payment_event(
+                event_id=None,
+                event_type="payment.verification_failed",
+                payment_id=req.razorpay_payment_id,
+                order_id=req.razorpay_order_id,
+                user_id=req.user_id,
+                payload_json=f'{{"error": "Invalid signature", "received_sig": "{req.razorpay_signature}"}}',
+                status="rejected",
+            )
+            raise HTTPException(
+                status_code=400,
+                detail="Payment signature verification failed. Untrusted checkout attempt rejected.",
+            )
+
+        settings = get_settings()
+        plan_amount = settings.PLANS.get(req.plan_type, {}).get("price_inr", 1999.0)
+
+        updated_user = activate_paid_subscription(
+            user_id=req.user_id,
+            plan_type=req.plan_type,
+            amount=plan_amount,
+            payment_id=req.razorpay_payment_id,
+            order_id=req.razorpay_order_id,
+        )
+
+        from src.db.database import record_payment_event
+        record_payment_event(
+            event_id=None,
+            event_type="payment.verification_success",
+            payment_id=req.razorpay_payment_id,
+            order_id=req.razorpay_order_id,
+            user_id=req.user_id,
+            payload_json=f'{{"status": "verified", "plan_type": "{req.plan_type}"}}',
+            status="verified",
+        )
+
+        plan_name = settings.PLANS.get(req.plan_type, {}).get("name", req.plan_type)
+        return VerifyPaymentResponse(
+            success=True,
+            user_id=updated_user["user_id"],
+            subscription_tier=updated_user["subscription_tier"],
+            credit_score=updated_user["credit_score"],
+            credit_tier=updated_user["credit_tier"],
+            message=f"Payment verified! Successfully activated {plan_name}. Green Credit score boosted to {updated_user['credit_score']}.",
+            payment_id=req.razorpay_payment_id,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/payments/webhook")
+async def razorpay_webhook(
+    request: Request,
+    x_razorpay_signature: Optional[str] = Header(None, alias="X-Razorpay-Signature"),
+):
+    """
+    Razorpay Webhook: Single source of truth for payment lifecycle events
+    (payment.captured, order.paid, payment.failed).
+    Works even if user closes browser immediately after checkout.
+    """
+    raw_body = await request.body()
+    try:
+        payload = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON body in webhook")
+
+    if not x_razorpay_signature:
+        raise HTTPException(status_code=400, detail="Missing X-Razorpay-Signature header")
+
+    try:
+        result = payment_service.process_webhook_event(
+            payload=payload,
+            raw_body=raw_body,
+            signature_header=x_razorpay_signature,
+        )
+        return {"status": "ok", "result": result}
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ------------------- Legacy Subscriptions (Backward Compatibility) -------------------
 
 @app.post("/api/subscription/subscribe", response_model=SubscriptionResponse)
 def activate_subscription(req: SubscriptionRequest):
@@ -304,6 +442,13 @@ def send_message(req: SendMessageRequest):
         if not recipient:
             raise HTTPException(status_code=404, detail=f"Recipient @{req.recipient_user_id} not found.")
 
+        # Gate direct messaging to active paid subscribers
+        if sender["subscription_tier"] == "free":
+            raise HTTPException(
+                status_code=403,
+                detail="A Corporate Access Pass (₹9,999) or Landowner Listing Plan is required to initiate direct landowner messaging.",
+            )
+
         msg = send_direct_message(
             sender_user_id=req.sender_user_id,
             recipient_user_id=req.recipient_user_id,
@@ -315,4 +460,5 @@ def send_message(req: SendMessageRequest):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 

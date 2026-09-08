@@ -310,6 +310,48 @@ class SubscriptionResponse(BaseModel):
     message: str
 
 
+# ------------------- Real Razorpay Payment Schemas -------------------
+
+class CreateOrderRequest(BaseModel):
+    user_id: str
+    plan_type: str  # 'landowner_listing' | 'corporate_access'
+    amount: Optional[float] = None
+
+
+class CreateOrderResponse(BaseModel):
+    order_id: str
+    amount: int  # in paise
+    amount_inr: float
+    currency: str = "INR"
+    key_id: str
+    plan_type: str
+    plan_name: str
+    user_id: str
+    user_name: str
+    user_email: str
+    upi_id: Optional[str] = "imananya07@okhdfcbank"
+    upi_payee_name: Optional[str] = "Ananya Singla - GreenVest"
+
+
+class VerifyPaymentRequest(BaseModel):
+    razorpay_order_id: str
+    razorpay_payment_id: str
+    razorpay_signature: str
+    user_id: str
+    plan_type: str
+
+
+class VerifyPaymentResponse(BaseModel):
+    success: bool
+    user_id: str
+    subscription_tier: str
+    credit_score: int
+    credit_tier: str
+    message: str
+    payment_id: str
+
+
+
 class SendMessageRequest(BaseModel):
     sender_user_id: str
     recipient_user_id: str

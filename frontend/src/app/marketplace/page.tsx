@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   MapPin,
@@ -29,11 +29,12 @@ import type { RealMarketplaceLand } from "@/types";
 import { Button } from "@/components/ui/Button";
 
 export default function MarketplacePage() {
-  const { user, subscribe } = useAuth();
+  const { user, initiateRazorpayPayment } = useAuth();
   const [lands, setLands] = useState<RealMarketplaceLand[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSoil, setSelectedSoil] = useState("all");
+  const [isGatedForBrowse, setIsGatedForBrowse] = useState(false);
 
   // Messaging Modal State
   const [messageTarget, setMessageTarget] = useState<RealMarketplaceLand | null>(null);
@@ -54,21 +55,33 @@ export default function MarketplacePage() {
   const [listingError, setListingError] = useState<string | null>(null);
   const [subscribing, setSubscribing] = useState(false);
 
-  useEffect(() => {
-    loadLands();
-  }, []);
+  // Payment Success Modal State
+  const [paymentSuccessData, setPaymentSuccessData] = useState<{
+    paymentId: string;
+    planName: string;
+    tier: string;
+    score: number;
+  } | null>(null);
 
-  const loadLands = async () => {
+  const loadLands = useCallback(async () => {
     setLoading(true);
+    setIsGatedForBrowse(false);
     try {
-      const data = await fetchMarketplaceLands();
+      const data = await fetchMarketplaceLands(user?.user_id);
       setLands(data);
-    } catch (err) {
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message.includes("Corporate Access Pass")) {
+        setIsGatedForBrowse(true);
+      }
       console.error("Failed loading lands:", err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    loadLands();
+  }, [loadLands]);
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -123,18 +136,35 @@ export default function MarketplacePage() {
     }
   };
 
-  const handleUpgradeSubscription = async () => {
+  const handleRazorpayCheckout = async (planType: "landowner_listing" | "corporate_access") => {
     setSubscribing(true);
     setListingError(null);
     try {
-      await subscribe("landowner_listing", 1999);
+      await initiateRazorpayPayment(planType, {
+        onSuccess: (res) => {
+          setPaymentSuccessData({
+            paymentId: res.payment_id,
+            planName: planType === "landowner_listing" ? "Landowner Listing Pass" : "Corporate Access Pass",
+            tier: res.subscription_tier,
+            score: res.credit_score,
+          });
+          loadLands();
+        },
+        onError: (err) => {
+          setListingError(err.message || "Payment verification failed.");
+        },
+        onCancel: () => {
+          setListingError("Payment cancelled. Your subscription tier remains Free.");
+        },
+      });
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Subscription activation failed";
+      const msg = err instanceof Error ? err.message : "Payment checkout error";
       setListingError(msg);
     } finally {
       setSubscribing(false);
     }
   };
+
 
   const filteredLands = lands.filter((l) => {
     const matchesSearch =
@@ -221,6 +251,51 @@ export default function MarketplacePage() {
             </select>
           </div>
         </div>
+
+        {/* Corporate Access Gate Banner */}
+        {isGatedForBrowse && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mt-6 rounded-2xl border border-blue-200 bg-blue-50/80 p-6 shadow-sm"
+          >
+            <div className="flex items-start gap-4">
+              <ShieldCheck className="h-8 w-8 shrink-0 text-blue-700 mt-0.5" />
+              <div className="flex-1">
+                <div className="text-xs font-bold uppercase tracking-wider text-blue-600 mb-1">
+                  Corporate Access Required
+                </div>
+                <h3 className="text-base font-bold text-blue-950">
+                  Browse the Verified Land Marketplace
+                </h3>
+                <p className="mt-1 text-xs text-blue-800 leading-relaxed">
+                  Your account is registered as a corporate user. Browsing verified land listings and messaging landowners requires the Corporate Access Pass.
+                </p>
+                <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-2xl font-black text-blue-950">₹9,999</span>
+                      <span className="text-xs text-blue-700">/ annual corporate pass</span>
+                    </div>
+                    <ul className="mt-2 space-y-0.5 text-xs text-blue-900">
+                      <li>✓ Unlimited marketplace browsing</li>
+                      <li>✓ Direct P2P messaging with landowners</li>
+                      <li>✓ ESG-verified portfolio matchmaking</li>
+                    </ul>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleRazorpayCheckout("corporate_access")}
+                    disabled={subscribing}
+                    className="shrink-0 rounded-xl bg-blue-800 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-blue-700 disabled:opacity-60"
+                  >
+                    {subscribing ? "Processing Payment..." : "Unlock Corporate Access →"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
 
         {/* Listings Grid */}
         {loading ? (
@@ -516,11 +591,11 @@ export default function MarketplacePage() {
                       </Button>
                       <Button
                         type="button"
-                        onClick={handleUpgradeSubscription}
+                        onClick={() => handleRazorpayCheckout("landowner_listing")}
                         disabled={subscribing}
                         className="bg-emerald-800 hover:bg-emerald-700"
                       >
-                        {subscribing ? "Activating..." : "Unlock Listing Pass (₹1,999) →"}
+                        {subscribing ? "Processing Payment..." : "Pay ₹1,999 via Razorpay →"}
                       </Button>
                     </div>
                   </div>
@@ -639,6 +714,62 @@ export default function MarketplacePage() {
                     </div>
                   </form>
                 )}
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* Payment Success Modal */}
+        <AnimatePresence>
+          {paymentSuccessData && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.92 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.92 }}
+                className="w-full max-w-md rounded-2xl border border-emerald-200 bg-white p-6 shadow-xl"
+              >
+                <div className="text-center">
+                  <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 mb-4">
+                    <CheckCircle2 className="h-9 w-9 text-emerald-600" />
+                  </div>
+                  <div className="text-xs font-bold uppercase tracking-wider text-emerald-600 mb-1">
+                    Payment Successful
+                  </div>
+                  <h2 className="text-lg font-bold text-olive-950">
+                    {paymentSuccessData.planName} Activated!
+                  </h2>
+                  <p className="mt-2 text-xs text-olive-600">
+                    Your GreenVest subscription is now live. You can start using all plan features immediately.
+                  </p>
+
+                  <div className="mt-5 space-y-2 rounded-xl bg-olive-50/80 border border-olive-100 p-4 text-left text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-olive-600">Plan</span>
+                      <span className="font-bold text-olive-900">{paymentSuccessData.planName}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-olive-600">Tier</span>
+                      <span className="font-bold text-olive-900 capitalize">{paymentSuccessData.tier}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-olive-600">Credit Score Boost</span>
+                      <span className="font-bold text-emerald-700">+{paymentSuccessData.score} pts</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-olive-600">Payment ID</span>
+                      <span className="font-mono text-[10px] text-olive-700">{paymentSuccessData.paymentId}</span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setPaymentSuccessData(null)}
+                    className="mt-5 w-full rounded-xl bg-olive-800 py-2.5 text-sm font-bold text-cream-50 transition hover:bg-olive-700"
+                  >
+                    Continue to Marketplace →
+                  </button>
+                </div>
               </motion.div>
             </div>
           )}

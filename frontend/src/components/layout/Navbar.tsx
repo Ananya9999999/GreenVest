@@ -14,6 +14,7 @@ const links = [
   { href: "/discover", label: "Discover" },
   { href: "/marketplace", label: "Marketplace" },
   { href: "/analyze", label: "Analyze" },
+  { href: "/pricing", label: "Pricing" },
   { href: "/dashboard", label: "Dashboard" },
 ];
 
@@ -68,6 +69,11 @@ export function Navbar() {
                 <span className="rounded-full bg-olive-800 px-2 py-0.5 text-[10px] font-bold text-white">
                   {user.credit_score}
                 </span>
+                {user.subscription_tier && user.subscription_tier !== "free" && (
+                  <span className="rounded-full bg-emerald-700 px-2 py-0.5 text-[10px] font-bold text-white">
+                    {user.subscription_tier === "landowner_listing" ? "Landowner" : "Corporate"}
+                  </span>
+                )}
               </Link>
               <button
                 type="button"

@@ -7,7 +7,7 @@ subscriptions, and direct user-to-user messages.
 import sqlite3
 import os
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 from src.scoring.credit_scorer import calculate_user_credit_score
 
@@ -69,14 +69,42 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id TEXT NOT NULL,
             plan_type TEXT NOT NULL,
-            amount_paid REAL NOT NULL,
+            amount REAL NOT NULL DEFAULT 0.0,
+            amount_paid REAL NOT NULL DEFAULT 0.0,
             status TEXT NOT NULL DEFAULT 'active',
+            payment_id TEXT,
+            order_id TEXT,
             created_at TEXT NOT NULL,
             FOREIGN KEY (user_id) REFERENCES users (user_id)
         )
     """)
 
-    # 4. Messages table (Direct User-to-User interaction via @userid)
+    # Schema migration checks for existing databases
+    c.execute("PRAGMA table_info(subscriptions)")
+    sub_cols = [row[1] for row in c.fetchall()]
+    if "payment_id" not in sub_cols:
+        c.execute("ALTER TABLE subscriptions ADD COLUMN payment_id TEXT")
+    if "order_id" not in sub_cols:
+        c.execute("ALTER TABLE subscriptions ADD COLUMN order_id TEXT")
+    if "amount" not in sub_cols:
+        c.execute("ALTER TABLE subscriptions ADD COLUMN amount REAL DEFAULT 0.0")
+
+    # 4. Payment events audit log (Webhooks & transaction events)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS payment_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            event_id TEXT UNIQUE,
+            event_type TEXT NOT NULL,
+            payment_id TEXT,
+            order_id TEXT,
+            user_id TEXT,
+            payload_json TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'processed',
+            created_at TEXT NOT NULL
+        )
+    """)
+
+    # 5. Messages table (Direct User-to-User interaction via @userid)
     c.execute("""
         CREATE TABLE IF NOT EXISTS messages (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -99,6 +127,7 @@ def init_db():
         _seed_real_data(conn)
 
     conn.close()
+
 
 
 def _seed_real_data(conn: sqlite3.Connection):
@@ -238,35 +267,98 @@ def register_user(
     return get_user_by_id(clean_uid)
 
 
-def update_subscription(user_id: str, plan_type: str, amount_paid: float) -> Dict[str, Any]:
+def activate_paid_subscription(
+    user_id: str,
+    plan_type: str,
+    amount: float,
+    payment_id: Optional[str] = None,
+    order_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Activates a verified paid subscription for a user.
+    Idempotent: if this payment_id has already been processed, returns the current profile.
+    Updates users.subscription_tier, writes row to subscriptions, and recalculates credit score.
+    """
     conn = get_db_connection()
     c = conn.cursor()
     clean_uid = user_id.strip("@").lower()
-    now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
-    c.execute("UPDATE users SET subscription_tier = ? WHERE user_id = ?", (plan_type, clean_uid))
-    c.execute("""
-        INSERT INTO subscriptions (user_id, plan_type, amount_paid, status, created_at)
-        VALUES (?, ?, ?, 'active', ?)
-    """, (clean_uid, plan_type, amount_paid, now))
-
-    # Recalculate credit score with active subscription bonus
+    # Check user existence
     user = get_user_by_id(clean_uid)
-    if user:
-        c_res = calculate_user_credit_score(
-            user_type=user["user_type"],
-            verified_area_ha=user["verified_area_ha"],
-            land_health_score=82.0,
-            stated_budget_inr=user["budget_inr"],
-            has_active_subscription=True,
-        )
-        c.execute("""
-            UPDATE users SET credit_score = ?, credit_tier = ?, credit_factors_json = ? WHERE user_id = ?
-        """, (c_res["credit_score"], c_res["tier"], json.dumps(c_res["factors"]), clean_uid))
+    if not user:
+        conn.close()
+        raise ValueError(f"User @{clean_uid} not found.")
+
+    # Idempotency check: if already active for this payment_id
+    if payment_id:
+        c.execute("SELECT id FROM subscriptions WHERE payment_id = ? AND status = 'active'", (payment_id,))
+        if c.fetchone():
+            conn.close()
+            return user
+
+    # 1. Update user subscription tier
+    c.execute("UPDATE users SET subscription_tier = ? WHERE user_id = ?", (plan_type, clean_uid))
+
+    # 2. Write row in subscriptions
+    c.execute("""
+        INSERT INTO subscriptions (user_id, plan_type, amount, amount_paid, status, payment_id, order_id, created_at)
+        VALUES (?, ?, ?, ?, 'active', ?, ?, ?)
+    """, (clean_uid, plan_type, amount, amount, payment_id, order_id, now))
+
+    # 3. Recalculate credit score with active subscription bonus
+    c_res = calculate_user_credit_score(
+        user_type=user["user_type"],
+        verified_area_ha=user["verified_area_ha"],
+        land_health_score=82.0,
+        stated_budget_inr=user["budget_inr"],
+        has_active_subscription=True,
+    )
+    c.execute("""
+        UPDATE users SET credit_score = ?, credit_tier = ?, credit_factors_json = ? WHERE user_id = ?
+    """, (c_res["credit_score"], c_res["tier"], json.dumps(c_res["factors"]), clean_uid))
 
     conn.commit()
     conn.close()
     return get_user_by_id(clean_uid)
+
+
+def update_subscription(user_id: str, plan_type: str, amount_paid: float) -> Dict[str, Any]:
+    """Legacy helper for backward compatibility, delegates to activate_paid_subscription."""
+    return activate_paid_subscription(user_id=user_id, plan_type=plan_type, amount=amount_paid)
+
+
+def record_payment_event(
+    event_id: Optional[str],
+    event_type: str,
+    payload_json: str,
+    payment_id: Optional[str] = None,
+    order_id: Optional[str] = None,
+    user_id: Optional[str] = None,
+    status: str = "processed",
+) -> None:
+    """Audit log for webhook events and checkout verification outcomes."""
+    conn = get_db_connection()
+    c = conn.cursor()
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    c.execute("""
+        INSERT OR IGNORE INTO payment_events (event_id, event_type, payment_id, order_id, user_id, payload_json, status, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (event_id, event_type, payment_id, order_id, user_id, payload_json, status, now))
+    conn.commit()
+    conn.close()
+
+
+def get_user_subscriptions(user_id: str) -> List[Dict[str, Any]]:
+    """Retrieve all subscriptions associated with a user."""
+    conn = get_db_connection()
+    c = conn.cursor()
+    clean_uid = user_id.strip("@").lower()
+    c.execute("SELECT * FROM subscriptions WHERE user_id = ? ORDER BY created_at DESC", (clean_uid,))
+    rows = c.fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
 
 
 def get_marketplace_lands() -> List[Dict[str, Any]]:

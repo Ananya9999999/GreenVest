@@ -297,3 +297,29 @@ export type SubscriptionResponse = {
   message: string;
 };
 
+export type PaymentOrderResponse = {
+  order_id: string;
+  amount: number;
+  amount_inr: number;
+  currency: string;
+  key_id: string;
+  plan_type: "landowner_listing" | "corporate_access";
+  plan_name: string;
+  user_id: string;
+  user_name: string;
+  user_email: string;
+  upi_id?: string;
+  upi_payee_name?: string;
+};
+
+export type VerifyPaymentResponse = {
+  success: boolean;
+  user_id: string;
+  subscription_tier: "landowner_listing" | "corporate_access";
+  credit_score: number;
+  credit_tier: string;
+  message: string;
+  payment_id: string;
+};
+
+

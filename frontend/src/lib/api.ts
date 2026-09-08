@@ -9,6 +9,8 @@ import type {
   RealMarketplaceLand,
   DirectMessage,
   SubscriptionResponse,
+  PaymentOrderResponse,
+  VerifyPaymentResponse,
 } from "@/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -444,12 +446,21 @@ export async function getUserProfile(userId: string): Promise<UserProfile> {
 
 // ------------------- Marketplace Lands -------------------
 
-export async function fetchMarketplaceLands(): Promise<RealMarketplaceLand[]> {
+export async function fetchMarketplaceLands(userId?: string): Promise<RealMarketplaceLand[]> {
   try {
-    const res = await fetch(`${API_BASE}/api/marketplace/lands`);
-    if (!res.ok) throw new Error("Failed to fetch lands");
+    const url = userId
+      ? `${API_BASE}/api/marketplace/lands?user_id=${encodeURIComponent(userId.replace(/^@/, ""))}`
+      : `${API_BASE}/api/marketplace/lands`;
+    const res = await fetch(url);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: "Failed to fetch lands" }));
+      throw new Error(err.detail || "Failed to fetch lands");
+    }
     return await res.json();
-  } catch (err) {
+  } catch (err: unknown) {
+    if (err instanceof Error && err.message.includes("Corporate Access Pass")) {
+      throw err;
+    }
     console.warn("Using fallback marketplace listings:", err);
     return [
       {
@@ -545,6 +556,44 @@ export async function createMarketplaceLand(payload: {
   return await res.json();
 }
 
+// ------------------- Real Razorpay Payments -------------------
+
+export async function createPaymentOrder(payload: {
+  user_id: string;
+  plan_type: "landowner_listing" | "corporate_access";
+  amount?: number;
+}): Promise<PaymentOrderResponse> {
+  const res = await fetch(`${API_BASE}/api/payments/create-order`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Failed to initialize payment order" }));
+    throw new Error(err.detail || "Failed to initialize payment order");
+  }
+  return await res.json();
+}
+
+export async function verifyPayment(payload: {
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
+  user_id: string;
+  plan_type: "landowner_listing" | "corporate_access";
+}): Promise<VerifyPaymentResponse> {
+  const res = await fetch(`${API_BASE}/api/payments/verify`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Payment verification failed" }));
+    throw new Error(err.detail || "Payment verification failed");
+  }
+  return await res.json();
+}
+
 // ------------------- Subscriptions -------------------
 
 export async function subscribeToPlan(payload: {
@@ -563,6 +612,7 @@ export async function subscribeToPlan(payload: {
   }
   return await res.json();
 }
+
 
 // ------------------- Direct User-to-User Messaging -------------------
 

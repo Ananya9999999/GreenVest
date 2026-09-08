@@ -87,7 +87,7 @@ const TIMELINE_MILESTONES = [
 ];
 
 export default function DashboardPage() {
-  const { user, subscribe } = useAuth();
+  const { user, initiateRazorpayPayment } = useAuth();
 
   const [strategy, setStrategy] = useState<StrategyRecommendation | null>(null);
   const [land, setLand] = useState<LandInput | null>(null);
@@ -159,13 +159,15 @@ export default function DashboardPage() {
     }
   };
 
-  const handleUpgrade = async (plan: "landowner_listing" | "corporate_access", amount: number) => {
+  const handleUpgrade = async (plan: "landowner_listing" | "corporate_access") => {
     setSubscribing(true);
     try {
-      await subscribe(plan, amount);
+      await initiateRazorpayPayment(plan, {
+        onSuccess: () => setSubscribing(false),
+        onCancel: () => setSubscribing(false),
+      });
     } catch (err) {
-      console.error("Subscription failed:", err);
-    } finally {
+      console.error("Payment failed:", err);
       setSubscribing(false);
     }
   };
@@ -407,10 +409,10 @@ export default function DashboardPage() {
                       <Button
                         size="sm"
                         disabled={subscribing}
-                        onClick={() => handleUpgrade("landowner_listing", 1999)}
+                        onClick={() => handleUpgrade("landowner_listing")}
                         className="bg-amber-800 hover:bg-amber-700 text-xs shrink-0"
                       >
-                        {subscribing ? "Activating..." : "Upgrade Now (₹1,999)"}
+                        {subscribing ? "Processing..." : "Pay ₹1,999 via Razorpay →"}
                       </Button>
                     </div>
                   </div>
