@@ -79,3 +79,40 @@ body {
     radial-gradient(at 80% 10%, rgba(201, 165, 110, 0.2) 0px, transparent 45%),
     radial-gradient(at 50% 80%, rgba(154, 115, 92, 0.12) 0px, transparent 50%);
 }
+
+/* GreenVest Leaflet Custom Popup Styling */
+.leaflet-popup-content-wrapper {
+  background: #ffffff !important;
+  color: #171e11 !important;
+  border-radius: 1rem !important;
+  border: 1px solid #d8d2c7 !important;
+  box-shadow: 0 10px 25px -5px rgba(30, 41, 28, 0.18), 0 8px 10px -6px rgba(30, 41, 28, 0.1) !important;
+  padding: 4px !important;
+}
+
+.leaflet-popup-tip {
+  background: #ffffff !important;
+  border: 1px solid #d8d2c7 !important;
+}
+
+.leaflet-popup-close-button {
+  color: #7c8b77 !important;
+  padding: 6px !important;
+  top: 6px !important;
+  right: 6px !important;
+}
+
+.leaflet-popup-close-button:hover {
+  color: #171e11 !important;
+}
+
+.gv-leaflet-marker {
+  background: transparent !important;
+  border: none !important;
+}
+
+.gv-pinned-land-marker {
+  background: transparent !important;
+  border: none !important;
+}
+

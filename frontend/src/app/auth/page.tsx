@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   User,
@@ -14,8 +14,10 @@ import {
 import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/context/AuthContext";
 
-export default function AuthPage() {
+function AuthForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTarget = searchParams.get("redirect") || "/dashboard";
   const { login, register } = useAuth();
 
   const [mode, setMode] = useState<"login" | "register">("login");
@@ -54,7 +56,7 @@ export default function AuthPage() {
           budget_inr: parseFloat(budget) || 0,
         });
       }
-      router.push("/dashboard");
+      router.push(redirectTarget);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Authentication failed. Please check inputs.";
       setError(msg);
@@ -68,7 +70,7 @@ export default function AuthPage() {
     setError(null);
     try {
       await login(handle, "pass123");
-      router.push("/dashboard");
+      router.push(redirectTarget);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed quick login";
       setError(msg);
@@ -324,5 +326,19 @@ export default function AuthPage() {
         </div>
       </motion.div>
     </div>
+  );
+}
+
+export default function AuthPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-[#FAF8F5]">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-olive-800 border-t-transparent" />
+        </div>
+      }
+    >
+      <AuthForm />
+    </Suspense>
   );
 }

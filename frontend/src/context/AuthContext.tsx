@@ -69,31 +69,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // Always rehydrate from backend DB so database is single source of truth
           await refreshProfile(parsed.user_id);
         } else {
-          // Default initial session as sample landowner for seamless demo evaluation
-          const defaultUser: UserProfile = {
-            user_id: "nashik_organic_agro",
-            name: "Nashik Agro Holdings",
-            email: "contact@nashikagro.in",
-            user_type: "landowner",
-            credit_score: 790,
-            credit_tier: "Prime Green A+ (Tier 1 Verified)",
-            credit_factors: [
-              { name: "Land Equity & Asset Base", points: 94, max_points: 150, description: "Verified 12.5 ha landholding collateral" },
-              { name: "Ecological Health & Stewardship", points: 126, max_points: 150, description: "Average Land Health Score 84/100" },
-              { name: "Financial Capacity & Reserves", points: 63, max_points: 125, description: "₹5.0 Lakhs capital verified" },
-              { name: "Verification & Platform Standing", points: 55, max_points: 75, description: "Active subscription & verified identity" },
-            ],
-            subscription_tier: "landowner_listing",
-            verified_area_ha: 12.5,
-            budget_inr: 500000.0,
-            created_at: "2026-03-01",
-          };
-          setUser(defaultUser);
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultUser));
-          await refreshProfile(defaultUser.user_id);
+          setUser(null);
         }
       } catch {
-        // ignore storage error
+        setUser(null);
       } finally {
         setLoading(false);
       }

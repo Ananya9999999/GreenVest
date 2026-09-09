@@ -20,6 +20,7 @@ import {
   Thermometer,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { AuthGuard } from "@/components/auth/AuthGuard";
 import { analyzeLand, simulateWhatIf, sendChatMessage } from "@/lib/api";
 import type {
   AdvisorResult,
@@ -38,6 +39,8 @@ function AnalyzeContent() {
     land_id: "GV-2026-001",
     location: searchParams.get("location") || "Nashik, Maharashtra",
     area_hectares: parseFloat(searchParams.get("area") || "12.5") || 12.5,
+    latitude: searchParams.get("lat") ? parseFloat(searchParams.get("lat")!) : undefined,
+    longitude: searchParams.get("lon") ? parseFloat(searchParams.get("lon")!) : undefined,
     soil_type: searchParams.get("soil") || "Black soil",
     water_availability: searchParams.get("water") || "Moderate",
     budget: parseFloat(searchParams.get("budget") || "500000") || 500000,
@@ -87,6 +90,8 @@ function AnalyzeContent() {
             ...prev,
             location: parsed.location || prev.location,
             area_hectares: parseFloat(parsed.area) || prev.area_hectares,
+            latitude: parsed.latitude ? parseFloat(parsed.latitude) : prev.latitude,
+            longitude: parsed.longitude ? parseFloat(parsed.longitude) : prev.longitude,
             soil_type: parsed.soil_type || prev.soil_type,
             water_availability: parsed.water_availability || prev.water_availability,
             budget: parseFloat(parsed.budget) || prev.budget,
@@ -1245,7 +1250,12 @@ export default function AnalyzePage() {
         </div>
       }
     >
-      <AnalyzeContent />
+      <AuthGuard
+        fallbackTitle="Land Analysis Engine"
+        fallbackDescription="Please sign in or register to access the bio-climatic analysis, GreenScore calculator, and 20-year carbon forecasts."
+      >
+        <AnalyzeContent />
+      </AuthGuard>
     </Suspense>
   );
 }

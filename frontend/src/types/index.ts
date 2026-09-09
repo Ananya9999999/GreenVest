@@ -10,6 +10,8 @@ export type LandInput = {
   land_id: string;
   location: string;
   area_hectares: number;
+  latitude?: number;
+  longitude?: number;
   soil_type?: string;
   water_availability?: string;
   budget: number;
@@ -219,6 +221,9 @@ export type SatelliteAlert = {
 
 export type SatelliteMonitoringData = {
   land_id: string;
+  location?: string;
+  latitude?: number;
+  longitude?: number;
   ndvi_current: number;
   ndvi_baseline: number;
   ndvi_trend_percent: number;
@@ -270,6 +275,8 @@ export type RealMarketplaceLand = {
   title: string;
   location: string;
   area_hectares: number;
+  latitude?: number;
+  longitude?: number;
   soil_type: string;
   water_availability: string;
   asking_price_inr: number;

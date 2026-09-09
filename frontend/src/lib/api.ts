@@ -354,15 +354,33 @@ export async function sendChatMessage(message: string, landId: string = "GV-2026
   }
 }
 
-export async function fetchSatelliteData(landId: string = "GV-2026-001"): Promise<SatelliteMonitoringData> {
+export async function fetchSatelliteData(
+  landId: string = "GV-2026-001",
+  lat?: number,
+  lon?: number
+): Promise<SatelliteMonitoringData> {
   try {
-    const res = await fetch(`${API_BASE}/api/satellite/${landId}`);
-    if (!res.ok) throw new Error(`Satellite fetch error: ${res.status}`);
+    const params = new URLSearchParams();
+    if (landId) params.set("land_id", landId);
+    if (lat !== undefined) params.set("lat", lat.toString());
+    if (lon !== undefined) params.set("lon", lon.toString());
+    const query = params.toString() ? `?${params.toString()}` : "";
+    const res = await fetch(`${API_BASE}/api/satellite${query}`);
+    if (!res.ok) {
+      const res2 = await fetch(`${API_BASE}/api/satellite/${landId}`);
+      if (!res2.ok) throw new Error(`Satellite fetch error: ${res2.status}`);
+      return await res2.json();
+    }
     return await res.json();
   } catch (err) {
     console.warn("Using fallback satellite data:", err);
+    const resolvedLat = lat || 19.9975;
+    const resolvedLon = lon || 73.7898;
     return {
       land_id: landId,
+      location: "Deccan Plateau, India",
+      latitude: resolvedLat,
+      longitude: resolvedLon,
       ndvi_current: 0.71,
       ndvi_baseline: 0.38,
       ndvi_trend_percent: 12.4,
@@ -472,6 +490,8 @@ export async function fetchMarketplaceLands(userId?: string): Promise<RealMarket
         title: "Prime Deccan Black Soil Agroforestry Holding",
         location: "Nashik, MH",
         area_hectares: 12.5,
+        latitude: 19.9975,
+        longitude: 73.7898,
         soil_type: "Black soil",
         water_availability: "Moderate (Borewell & Aquifer)",
         asking_price_inr: 5250000.0,
@@ -489,6 +509,8 @@ export async function fetchMarketplaceLands(userId?: string): Promise<RealMarket
         title: "Western Ghats Foothills Red Loam Holding",
         location: "Coimbatore, TN",
         area_hectares: 8.0,
+        latitude: 11.0168,
+        longitude: 76.9558,
         soil_type: "Red loam",
         water_availability: "Moderate (Seasonal Rain & Well)",
         asking_price_inr: 3040000.0,
@@ -506,6 +528,8 @@ export async function fetchMarketplaceLands(userId?: string): Promise<RealMarket
         title: "Riverine High-Percolation Alluvial Land",
         location: "Pune rural, MH",
         area_hectares: 20.0,
+        latitude: 18.5204,
+        longitude: 73.8567,
         soil_type: "Alluvial",
         water_availability: "Abundant (Canal & High Water Table)",
         asking_price_inr: 10200000.0,
@@ -523,6 +547,8 @@ export async function fetchMarketplaceLands(userId?: string): Promise<RealMarket
         title: "Mysuru Sub-Tropical Agro-Ecological Plot",
         location: "Mysuru, KA",
         area_hectares: 6.2,
+        latitude: 12.2958,
+        longitude: 76.6394,
         soil_type: "Sandy loam",
         water_availability: "Rainfed / Constrained",
         asking_price_inr: 1984000.0,
@@ -543,6 +569,8 @@ export async function createMarketplaceLand(payload: {
   soil_type: string;
   water_availability: string;
   asking_price_inr: number;
+  latitude?: number;
+  longitude?: number;
 }): Promise<RealMarketplaceLand> {
   const res = await fetch(`${API_BASE}/api/marketplace/lands`, {
     method: "POST",

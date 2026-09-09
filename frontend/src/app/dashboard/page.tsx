@@ -21,6 +21,7 @@ import {
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/context/AuthContext";
+import { AuthGuard } from "@/components/auth/AuthGuard";
 import {
   fetchSatelliteData,
   fetchUserMessages,
@@ -188,7 +189,11 @@ export default function DashboardPage() {
   ];
 
   return (
-    <div className="page-enter mesh-bg pt-24 pb-24">
+    <AuthGuard
+      fallbackTitle="Dashboard Access Required"
+      fallbackDescription="Sign in or register your sovereign @userid to manage your verified land assets, track Green Credit scores, and review Sentinel-2 satellite telemetry."
+    >
+      <div className="page-enter mesh-bg pt-24 pb-24">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* User Identity Hero Card */}
         <motion.div
@@ -850,5 +855,6 @@ export default function DashboardPage() {
         )}
       </div>
     </div>
+    </AuthGuard>
   );
 }
