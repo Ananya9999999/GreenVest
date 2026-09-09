@@ -12,7 +12,6 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { useAuth } from "@/context/AuthContext";
 
 const pillars = [
   {
@@ -40,7 +39,6 @@ const team = [
 ];
 
 export default function AboutPage() {
-  const { user } = useAuth();
   return (
     <div className="min-h-screen bg-cream-50">
       {/* Hero */}
@@ -184,35 +182,17 @@ export default function AboutPage() {
               Create your @userid, score a parcel, or browse the marketplace with corporate access.
             </p>
             <div className="mt-8 flex flex-wrap justify-center gap-3">
-              {user ? (
-                <>
-                  <Link href="/discover">
-                    <Button className="gap-2 bg-cream-100 text-olive-900 hover:bg-cream-50">
-                      Analyze land
-                      <ArrowRight className="h-4 w-4" />
-                    </Button>
-                  </Link>
-                  <Link href="/dashboard">
-                    <Button variant="outline" className="border-cream-400/40 text-cream-50 hover:bg-olive-800">
-                      Go to dashboard
-                    </Button>
-                  </Link>
-                </>
-              ) : (
-                <>
-                  <Link href="/auth">
-                    <Button className="gap-2 bg-cream-100 text-olive-900 hover:bg-cream-50">
-                      Get started
-                      <ArrowRight className="h-4 w-4" />
-                    </Button>
-                  </Link>
-                  <Link href="/marketplace">
-                    <Button variant="outline" className="border-cream-400/40 text-cream-50 hover:bg-olive-800">
-                      View marketplace
-                    </Button>
-                  </Link>
-                </>
-              )}
+              <Link href="/auth">
+                <Button className="gap-2 bg-cream-100 text-olive-900 hover:bg-cream-50">
+                  Get started
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </Link>
+              <Link href="/marketplace">
+                <Button variant="outline" className="border-cream-400/40 text-cream-50 hover:bg-olive-800">
+                  View marketplace
+                </Button>
+              </Link>
             </div>
           </div>
         </div>

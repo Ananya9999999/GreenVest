@@ -5,8 +5,11 @@ import { motion } from "framer-motion";
 import { ArrowRight, Leaf, Globe2, Handshake } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Logo } from "@/components/layout/Logo";
+import { useAuth } from "@/context/AuthContext";
 
 export default function HomePage() {
+  const { user, loading } = useAuth();
+
   return (
     <div className="mesh-bg min-h-screen">
       <section className="relative overflow-hidden pt-28 pb-20 sm:pt-32 sm:pb-28">
@@ -44,18 +47,41 @@ export default function HomePage() {
               @userid. We match. You decide.
             </p>
 
-            <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
-              <Link href="/auth">
-                <Button size="lg" className="gap-2">
-                  Sign up
-                  <ArrowRight className="h-4 w-4" />
-                </Button>
-              </Link>
-              <Link href="/auth">
-                <Button size="lg" variant="outline">
-                  Sign in
-                </Button>
-              </Link>
+            <div className="mt-10 flex min-h-[52px] flex-wrap items-center justify-center gap-3">
+              {!loading && user ? (
+                <>
+                  <Link href="/discover">
+                    <Button size="lg" className="gap-2">
+                      Analyze land
+                      <ArrowRight className="h-4 w-4" />
+                    </Button>
+                  </Link>
+                  <Link href="/marketplace">
+                    <Button size="lg" variant="outline">
+                      Marketplace
+                    </Button>
+                  </Link>
+                  <Link href="/dashboard">
+                    <Button size="lg" variant="ghost" className="text-olive-800">
+                      @{user.user_id}
+                    </Button>
+                  </Link>
+                </>
+              ) : !loading ? (
+                <>
+                  <Link href="/auth">
+                    <Button size="lg" className="gap-2">
+                      Sign up
+                      <ArrowRight className="h-4 w-4" />
+                    </Button>
+                  </Link>
+                  <Link href="/auth">
+                    <Button size="lg" variant="outline">
+                      Sign in
+                    </Button>
+                  </Link>
+                </>
+              ) : null}
             </div>
           </motion.div>
 
