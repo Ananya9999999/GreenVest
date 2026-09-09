@@ -18,6 +18,10 @@ import {
   Calendar,
   Layers,
   Thermometer,
+  Compass,
+  Navigation,
+  Globe,
+  ShieldAlert,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { AuthGuard } from "@/components/auth/AuthGuard";
@@ -485,6 +489,155 @@ function AnalyzeContent() {
             </motion.div>
           )}
         </div>
+
+        {/* LAND HEALTH SCORE V2 — EXPLAINABLE FACTOR BREAKDOWN */}
+        {data?.health_score_v2 && (
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.22 }}
+            className="mt-8 rounded-2xl border border-olive-200 bg-white p-6 shadow-sm"
+          >
+            {/* Header */}
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-olive-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-14 w-14 flex-col items-center justify-center rounded-xl bg-gradient-to-br from-emerald-700 to-olive-800 text-white shadow">
+                  <span className="text-2xl font-extrabold leading-none">
+                    {data.health_score_v2.land_health_score}
+                  </span>
+                  <span className="text-[9px] uppercase tracking-widest text-emerald-200">/ 100</span>
+                </div>
+                <div>
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-800 border border-emerald-200">
+                    <Globe className="h-3.5 w-3.5" />
+                    🌍 Land Health Score v2
+                  </span>
+                  <h3 className="mt-1 text-lg font-bold text-olive-950">
+                    Grade{" "}
+                    <span
+                      className={
+                        data.health_score_v2.grade.startsWith("A")
+                          ? "text-emerald-700"
+                          : data.health_score_v2.grade === "B"
+                          ? "text-olive-700"
+                          : "text-amber-700"
+                      }
+                    >
+                      {data.health_score_v2.grade}
+                    </span>
+                    {" "}— {data.health_score_v2.verdict}
+                  </h3>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-olive-500">
+                <ShieldAlert className="h-4 w-4" />
+                Explainable AI · 5-Factor Analysis
+              </div>
+            </div>
+
+            {/* 5 Factor Progress Bars */}
+            <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              {data.health_score_v2.factors.map((factor) => {
+                const pct = Math.round((factor.score / factor.max_score) * 100);
+                const color =
+                  pct >= 75
+                    ? "bg-emerald-600"
+                    : pct >= 50
+                    ? "bg-olive-600"
+                    : "bg-amber-500";
+                return (
+                  <div
+                    key={factor.name}
+                    className="rounded-xl border border-olive-100 bg-cream-50/60 p-3"
+                  >
+                    <div className="flex items-start justify-between gap-1 text-xs">
+                      <span className="font-semibold text-olive-800 leading-tight">{factor.name}</span>
+                      <span className="shrink-0 font-mono font-bold text-olive-900">
+                        {factor.score}/{factor.max_score}
+                      </span>
+                    </div>
+                    <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-olive-100">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${pct}%` }}
+                        transition={{ duration: 0.9 }}
+                        className={`h-full rounded-full ${color}`}
+                      />
+                    </div>
+                    <div className="mt-1.5 flex items-center justify-between text-[10px] text-olive-500">
+                      <span>{factor.weight_percent}% weight</span>
+                      <span
+                        className={
+                          pct >= 75
+                            ? "text-emerald-700 font-semibold"
+                            : pct >= 50
+                            ? "text-olive-600"
+                            : "text-amber-600 font-semibold"
+                        }
+                      >
+                        {pct}%
+                      </span>
+                    </div>
+                    <p className="mt-1 text-[10px] text-olive-500 line-clamp-2 leading-snug">
+                      {factor.detail}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Proximity badges */}
+            {(data.geospatial_enrichment?.distance_to_road_km != null ||
+              data.geospatial_enrichment?.distance_to_market_km != null) && (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {data.geospatial_enrichment.distance_to_road_km != null && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-olive-100 px-3 py-1 text-xs font-medium text-olive-800">
+                    <Navigation className="h-3.5 w-3.5" />
+                    {data.geospatial_enrichment.distance_to_road_km.toFixed(1)} km to motorable road
+                  </span>
+                )}
+                {data.geospatial_enrichment.distance_to_market_km != null && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-olive-100 px-3 py-1 text-xs font-medium text-olive-800">
+                    <Compass className="h-3.5 w-3.5" />
+                    {data.geospatial_enrichment.distance_to_market_km.toFixed(1)} km to nearest mandi
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* Data sources footnote */}
+            <p className="mt-4 text-[10px] text-olive-400 leading-relaxed">
+              Data:{" "}
+              <a
+                href="https://soilgrids.org"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline hover:text-olive-600"
+              >
+                ISRIC SoilGrids v2.0
+              </a>{" "}
+              ·{" "}
+              <a
+                href="https://overpass-api.de"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline hover:text-olive-600"
+              >
+                OSM Overpass
+              </a>{" "}
+              ·{" "}
+              <a
+                href="https://bhuvan.nrsc.gov.in"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline hover:text-olive-600"
+              >
+                ISRO Bhuvan Thematic
+              </a>{" "}
+              · NBSS-LUP ICAR
+            </p>
+          </motion.div>
+        )}
 
         {/* PRIORITY WEIGHT SLIDERS */}
         <motion.div

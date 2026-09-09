@@ -22,6 +22,9 @@ from src.models.schemas import (
     ComparisonMetricRow,
     StrategyComparisonEngine,
     AdvisorResult,
+    HealthScoreV2Factor,
+    HealthScoreV2Breakdown,
+    GeospatialEnrichResponse,
 )
 from src.ranker.ranker import rank_strategies
 from src.carbon.forecaster import forecast_sequestration, estimate_credits
@@ -421,7 +424,31 @@ def recommend(
     # 3. GreenScore
     greenscore = compute_greenscore(land, smart, climate_risk.overall_risk_score)
 
-    # 4. Nature Impact Score
+    # 4. Land Health Score v2 (Multi-factor explainable pedology & proximity engine)
+    from src.scoring.health_scorer_v2 import calculate_land_health_score_v2
+    health_v2_raw = calculate_land_health_score_v2(
+        soil_type=land.soil_type or "Black Vertisol",
+        soil_ph=getattr(land, "soil_ph", 7.4) or 7.4,
+        organic_carbon_pct=getattr(land, "organic_carbon_pct", 0.85) or 0.85,
+        water_availability=land.water_availability or "Moderate",
+        climate_risk_score=climate_risk.overall_risk_score,
+        distance_to_road_km=getattr(land, "distance_to_road_km", 1.0) or 1.0,
+        distance_to_market_km=getattr(land, "distance_to_market_km", 6.0) or 6.0,
+        vegetation_score=land.vegetation_score or 75.0,
+    )
+    health_score_v2 = HealthScoreV2Breakdown(
+        land_health_score=health_v2_raw["land_health_score"],
+        grade=health_v2_raw["grade"],
+        verdict=health_v2_raw["verdict"],
+        factors=[HealthScoreV2Factor(**f) for f in health_v2_raw["factors"]],
+        soil_score=health_v2_raw["soil_score"],
+        water_score=health_v2_raw["water_score"],
+        climate_score=health_v2_raw["climate_score"],
+        proximity_score=health_v2_raw["proximity_score"],
+        vegetation_score=health_v2_raw["vegetation_score"],
+    )
+
+    # 5. Nature Impact Score
     nature_impact = compute_nature_impact_score(land, greenscore)
 
     # 5. Build Top 3 Strategies
@@ -457,6 +484,8 @@ def recommend(
         land_id=land.land_id,
         smart_land=smart,
         greenscore=greenscore,
+        health_score_v2=health_score_v2,
+        geospatial_enrichment=getattr(land, "_geospatial_enrichment", None),
         nature_impact=nature_impact,
         strategies=ranked,
         carbon_forecasts=forecasts,

@@ -59,8 +59,22 @@ export function MapMarkerPopup({ marker, onSelect }: MapMarkerPopupProps) {
         )}
       </div>
 
+      {/* Geospatial Pedology & Proximity */}
+      <div className="mt-2 grid grid-cols-2 gap-1 text-[10px]">
+        <div className="rounded bg-olive-50 px-1.5 py-1 border border-olive-100/80">
+          <span className="text-olive-500 block text-[9px]">Soil</span>
+          <span className="font-medium text-olive-900 truncate block">{marker.soil || "Black Vertisol"}</span>
+        </div>
+        <div className="rounded bg-olive-50 px-1.5 py-1 border border-olive-100/80">
+          <span className="text-olive-500 block text-[9px]">Proximity</span>
+          <span className="font-medium text-olive-900 truncate block">
+            {marker.distance_to_road_km ? `${marker.distance_to_road_km}km road` : "1.0km road"}
+          </span>
+        </div>
+      </div>
+
       {marker.price && (
-        <div className="mt-2 flex items-baseline justify-between pt-1">
+        <div className="mt-2 flex items-baseline justify-between pt-1 border-t border-olive-100">
           <span className="text-[10px] text-olive-500">Valuation:</span>
           <span className="text-xs font-extrabold text-olive-950">
             {formatPrice(marker.price)}

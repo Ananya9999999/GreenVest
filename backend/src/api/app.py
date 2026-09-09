@@ -29,6 +29,7 @@ from src.models.schemas import (
     VerifyPaymentResponse,
     SendMessageRequest,
     DirectMessageItem,
+    GeospatialEnrichResponse,
 )
 from src.advisor.advisor import recommend
 from src.advisor.simulator import simulate_scenario
@@ -114,6 +115,23 @@ def health_check():
     }
 
 
+@app.get("/api/geospatial/enrich", response_model=GeospatialEnrichResponse)
+def get_geospatial_enrichment(lat: float, lon: float):
+    """
+    Enriches arbitrary latitude/longitude with real geospatial signals:
+    - ISRIC SoilGrids v2.0 physical pedology (clay/sand/silt/SOC/pH) & NBSS-LUP ICAR fallbacks
+    - OpenStreetMap Overpass proximity (distance to motorable road & mandi/town in km)
+    - ISRO Bhuvan open thematic metadata
+    - High-performance grid-cell caching
+    """
+    try:
+        from src.geospatial.enricher import enrich_geospatial_point
+        enriched = enrich_geospatial_point(lat, lon)
+        return enriched
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Geospatial enrichment failed: {str(e)}")
+
+
 @app.post("/api/analyze", response_model=AdvisorResult)
 def run_analysis(payload: AnalyzePayload):
     try:
@@ -131,6 +149,21 @@ def run_analysis(payload: AnalyzePayload):
                 investment_horizon_years=payload.investment_horizon_years or 15,
                 health_score=payload.health_score or 82.0,
             )
+
+        # Enrich geospatial signals if coordinates are provided
+        if land.latitude is not None and land.longitude is not None:
+            try:
+                from src.geospatial.enricher import enrich_geospatial_point
+                enriched_data = enrich_geospatial_point(land.latitude, land.longitude)
+                if not land.soil_type or land.soil_type == "Black soil":
+                    land.soil_type = enriched_data.get("soil_type", land.soil_type)
+                land.distance_to_road_km = float(enriched_data.get("distance_to_road_km", land.distance_to_road_km or 1.0))
+                land.distance_to_market_km = float(enriched_data.get("distance_to_market_km", land.distance_to_market_km or 6.0))
+                land.soil_ph = float(enriched_data.get("soil_ph", land.soil_ph or 7.4))
+                land.organic_carbon_pct = float(enriched_data.get("organic_carbon_pct", land.organic_carbon_pct or 0.85))
+                setattr(land, "_geospatial_enrichment", enriched_data)
+            except Exception:
+                pass
 
         weights = payload.weights or PreferenceWeights(
             carbon=7.0, roi=7.0, low_risk=6.0, biodiversity=7.0, water_efficiency=6.0
@@ -273,6 +306,8 @@ def create_land(req: CreateLandRequest):
             asking_price_inr=req.asking_price_inr,
             latitude=req.latitude,
             longitude=req.longitude,
+            distance_to_road_km=req.distance_to_road_km,
+            distance_to_market_km=req.distance_to_market_km,
         )
         return new_land
     except HTTPException:

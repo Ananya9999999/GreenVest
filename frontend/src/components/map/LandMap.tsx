@@ -72,12 +72,39 @@ export function LandMap({
           doubleClickZoom: interactive,
         });
 
-        // Add high-clarity OpenStreetMap Tile Layer
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        // Base tile layers
+        const osmLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
           attribution:
-            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors | GreenVest AI',
+            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> | GreenVest AI',
           maxZoom: 19,
-        }).addTo(map);
+        });
+
+        // ISRO Bhuvan Open Web Map Service (WMS/Thematic)
+        // Public WMS endpoint for Indian Cartographic & LULC Visualization
+        const bhuvanLayer = L.tileLayer.wms(
+          "https://bhuvan-vec1.nrsc.gov.in/bhuvan/gwc/service/wms",
+          {
+            layers: "india3",
+            format: "image/png",
+            transparent: true,
+            attribution: '&copy; <a href="https://bhuvan.nrsc.gov.in">ISRO / NRSC Bhuvan</a>',
+            maxZoom: 19,
+          }
+        );
+
+        osmLayer.addTo(map);
+
+        // Add layer control for OpenStreetMap and ISRO Bhuvan
+        L.control
+          .layers(
+            {
+              "OpenStreetMap (Standard)": osmLayer,
+              "ISRO Bhuvan (Thematic)": bhuvanLayer,
+            },
+            undefined,
+            { position: "topright" }
+          )
+          .addTo(map);
 
         const markersLayer = L.layerGroup().addTo(map);
         markersGroupRef.current = markersLayer;
@@ -163,6 +190,10 @@ export function LandMap({
             <div style="margin-top: 4px; font-size: 11px; color: #5C6F57; display: flex; justify-content: space-between;">
               <span>📍 ${marker.label}</span>
               ${marker.area ? `<span><strong>${marker.area}</strong> ha</span>` : ""}
+            </div>
+            <div style="margin-top: 4px; font-size: 10px; color: #3F513D; background: #F4F6F3; padding: 4px 6px; border-radius: 4px;">
+              <span>🌱 ${marker.soil || "Black Vertisol"}</span>
+              ${marker.distance_to_road_km ? `<span style="margin-left: 6px;">🛣️ ${marker.distance_to_road_km} km road</span>` : ""}
             </div>
             ${
               marker.price

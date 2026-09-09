@@ -23,6 +23,10 @@ export type LandInput = {
   vegetation_score?: number;
   terrain_score?: number;
   climate_risk?: number;
+  distance_to_road_km?: number;
+  distance_to_market_km?: number;
+  soil_ph?: number;
+  organic_carbon_pct?: number;
 };
 
 export type SmartLandAnalysis = {
@@ -166,10 +170,59 @@ export type StrategyComparisonEngine = {
   recommendation_rationale: string;
 };
 
+export type HealthScoreV2Factor = {
+  name: string;
+  score: number;
+  max_score: number;
+  weight_percent: number;
+  detail: string;
+};
+
+export type HealthScoreV2Breakdown = {
+  land_health_score: number;
+  grade: string;
+  verdict: string;
+  factors: HealthScoreV2Factor[];
+  soil_score: number;
+  water_score: number;
+  climate_score: number;
+  proximity_score: number;
+  vegetation_score: number;
+};
+
+export type GeospatialEnrichResult = {
+  grid_cell: string;
+  latitude: number;
+  longitude: number;
+  soil_type: string;
+  soil_texture: string;
+  soil_ph: number;
+  organic_carbon_pct: number;
+  clay_fraction: number;
+  sand_fraction: number;
+  silt_fraction: number;
+  soil_suitability: string;
+  distance_to_road_km: number;
+  nearest_road_type: string;
+  distance_to_market_km: number;
+  nearest_market_name: string;
+  bhuvan_context: {
+    legal_use: string;
+    wms_capabilities_endpoint: string;
+    recommended_layers: Array<{ id: string; name: string; authority: string }>;
+    integration_note: string;
+  };
+  sources: string[];
+  from_cache: boolean;
+  timestamp: string;
+};
+
 export type AdvisorResult = {
   land_id: string;
   smart_land: SmartLandAnalysis;
   greenscore: GreenScore;
+  health_score_v2?: HealthScoreV2Breakdown;
+  geospatial_enrichment?: GeospatialEnrichResult;
   nature_impact: NatureImpactScore;
   strategies: StrategyRecommendation[];
   carbon_forecasts: CarbonForecast[];
@@ -282,6 +335,9 @@ export type RealMarketplaceLand = {
   asking_price_inr: number;
   land_health_score: number;
   carbon_potential: number;
+  distance_to_road_km?: number;
+  distance_to_market_km?: number;
+  geospatial_sources?: string[];
   status: string;
   created_at: string;
 };

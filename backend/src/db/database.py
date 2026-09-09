@@ -59,6 +59,9 @@ def init_db():
             asking_price_inr REAL NOT NULL,
             land_health_score INTEGER NOT NULL,
             carbon_potential REAL NOT NULL,
+            distance_to_road_km REAL DEFAULT 1.0,
+            distance_to_market_km REAL DEFAULT 6.0,
+            geospatial_data_json TEXT,
             status TEXT NOT NULL DEFAULT 'active',
             created_at TEXT NOT NULL,
             FOREIGN KEY (owner_user_id) REFERENCES users (user_id)
@@ -72,14 +75,20 @@ def init_db():
         c.execute("ALTER TABLE lands ADD COLUMN latitude REAL")
     if "longitude" not in land_cols:
         c.execute("ALTER TABLE lands ADD COLUMN longitude REAL")
+    if "distance_to_road_km" not in land_cols:
+        c.execute("ALTER TABLE lands ADD COLUMN distance_to_road_km REAL DEFAULT 1.0")
+    if "distance_to_market_km" not in land_cols:
+        c.execute("ALTER TABLE lands ADD COLUMN distance_to_market_km REAL DEFAULT 6.0")
+    if "geospatial_data_json" not in land_cols:
+        c.execute("ALTER TABLE lands ADD COLUMN geospatial_data_json TEXT")
 
-    # Populate coordinates for seeded lands if missing
-    c.execute("UPDATE lands SET latitude = 19.9975, longitude = 73.7898 WHERE land_id = 'LAND-MH-84210' AND latitude IS NULL")
-    c.execute("UPDATE lands SET latitude = 11.0168, longitude = 76.9558 WHERE land_id = 'LAND-TN-39102' AND latitude IS NULL")
-    c.execute("UPDATE lands SET latitude = 18.5204, longitude = 73.8567 WHERE land_id = 'LAND-MH-93114' AND latitude IS NULL")
-    c.execute("UPDATE lands SET latitude = 12.2958, longitude = 76.6394 WHERE land_id = 'LAND-KA-48120' AND latitude IS NULL")
-    c.execute("UPDATE lands SET latitude = 22.7196, longitude = 75.8577 WHERE land_id = 'LAND-MP-59218' AND latitude IS NULL")
-    c.execute("UPDATE lands SET latitude = 17.9689, longitude = 79.5941 WHERE land_id = 'LAND-TS-67104' AND latitude IS NULL")
+    # Populate coordinates & distances for seeded lands if missing
+    c.execute("UPDATE lands SET latitude = 19.9975, longitude = 73.7898, distance_to_road_km = 0.4, distance_to_market_km = 4.8 WHERE land_id = 'LAND-MH-84210' AND latitude IS NULL")
+    c.execute("UPDATE lands SET latitude = 11.0168, longitude = 76.9558, distance_to_road_km = 1.2, distance_to_market_km = 8.5 WHERE land_id = 'LAND-TN-39102' AND latitude IS NULL")
+    c.execute("UPDATE lands SET latitude = 18.5204, longitude = 73.8567, distance_to_road_km = 0.2, distance_to_market_km = 3.2 WHERE land_id = 'LAND-MH-93114' AND latitude IS NULL")
+    c.execute("UPDATE lands SET latitude = 12.2958, longitude = 76.6394, distance_to_road_km = 2.4, distance_to_market_km = 14.0 WHERE land_id = 'LAND-KA-48120' AND latitude IS NULL")
+    c.execute("UPDATE lands SET latitude = 22.7196, longitude = 75.8577, distance_to_road_km = 0.8, distance_to_market_km = 7.1 WHERE land_id = 'LAND-MP-59218' AND latitude IS NULL")
+    c.execute("UPDATE lands SET latitude = 17.9689, longitude = 79.5941, distance_to_road_km = 1.6, distance_to_market_km = 11.2 WHERE land_id = 'LAND-TS-67104' AND latitude IS NULL")
     c.execute("UPDATE lands SET latitude = 19.9975, longitude = 73.7898 WHERE location LIKE '%Nashik%' AND latitude IS NULL")
     c.execute("UPDATE lands SET latitude = 18.5204, longitude = 73.8567 WHERE location LIKE '%Pune%' AND latitude IS NULL")
     c.execute("UPDATE lands SET latitude = 11.0168, longitude = 76.9558 WHERE location LIKE '%Coimbatore%' AND latitude IS NULL")
@@ -87,6 +96,19 @@ def init_db():
     c.execute("UPDATE lands SET latitude = 22.7196, longitude = 75.8577 WHERE location LIKE '%Indore%' AND latitude IS NULL")
     c.execute("UPDATE lands SET latitude = 17.9689, longitude = 79.5941 WHERE location LIKE '%Warangal%' AND latitude IS NULL")
     c.execute("UPDATE lands SET latitude = 19.0760, longitude = 72.8777 WHERE latitude IS NULL")
+    c.execute("UPDATE lands SET distance_to_road_km = 0.6 WHERE distance_to_road_km IS NULL")
+    c.execute("UPDATE lands SET distance_to_market_km = 5.5 WHERE distance_to_market_km IS NULL")
+
+    # Geospatial grid cache table
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS geospatial_cache (
+            cell_key TEXT PRIMARY KEY,
+            lat REAL NOT NULL,
+            lon REAL NOT NULL,
+            data_json TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+    """)
 
     # 3. Subscriptions table
     c.execute("""
@@ -181,21 +203,21 @@ def _seed_real_data(conn: sqlite3.Connection):
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (uid, name, email, pw, utype, c_res["credit_score"], c_res["tier"], json.dumps(c_res["factors"]), sub, area, budget, now))
 
-    # Real lands with unique landid and real coordinates
+    # Real lands with unique landid, real coordinates and real proximity distances
     lands = [
-        ("LAND-MH-84210", "nashik_organic_agro", "Prime Deccan Black Soil Agroforestry Parcel", "Nashik, MH", 12.5, 19.9975, 73.7898, "Black soil", "Moderate (Borewell & Aquifer)", 5250000.0, 84, 9.2),
-        ("LAND-TN-39102", "coimbatore_orchards", "Western Ghats Foothills Red Loam Holding", "Coimbatore, TN", 8.0, 11.0168, 76.9558, "Red loam", "Moderate (Seasonal Rain & Well)", 3040000.0, 76, 7.8),
-        ("LAND-MH-93114", "deccan_timber_trust", "Riverine High-Percolation Alluvial Land", "Pune rural, MH", 20.0, 18.5204, 73.8567, "Alluvial", "Abundant (Canal & High Water Table)", 10200000.0, 88, 9.5),
-        ("LAND-KA-48120", "deccan_timber_trust", "Mysuru Sub-Tropical Agro-Ecological Plot", "Mysuru, KA", 6.2, 12.2958, 76.6394, "Sandy loam", "Rainfed / Constrained", 1984000.0, 71, 6.5),
-        ("LAND-MP-59218", "nashik_organic_agro", "Malwa Plateau Deep Soil Plantation Zone", "Indore, MP", 15.0, 22.7196, 75.8577, "Black soil", "Moderate (Borewell)", 5850000.0, 79, 8.4),
-        ("LAND-TS-67104", "coimbatore_orchards", "Warangal Semi-Arid Carbon Restoration Plot", "Warangal, TS", 10.5, 17.9689, 79.5941, "Red soil", "Rainfed / Seasonal Tank", 3045000.0, 74, 7.1),
+        ("LAND-MH-84210", "nashik_organic_agro", "Prime Deccan Black Soil Agroforestry Parcel", "Nashik, MH", 12.5, 19.9975, 73.7898, "Black soil", "Moderate (Borewell & Aquifer)", 5250000.0, 84, 9.2, 0.4, 4.8),
+        ("LAND-TN-39102", "coimbatore_orchards", "Western Ghats Foothills Red Loam Holding", "Coimbatore, TN", 8.0, 11.0168, 76.9558, "Red loam", "Moderate (Seasonal Rain & Well)", 3040000.0, 76, 7.8, 1.2, 8.5),
+        ("LAND-MH-93114", "deccan_timber_trust", "Riverine High-Percolation Alluvial Land", "Pune rural, MH", 20.0, 18.5204, 73.8567, "Alluvial", "Abundant (Canal & High Water Table)", 10200000.0, 88, 9.5, 0.2, 3.2),
+        ("LAND-KA-48120", "deccan_timber_trust", "Mysuru Sub-Tropical Agro-Ecological Plot", "Mysuru, KA", 6.2, 12.2958, 76.6394, "Sandy loam", "Rainfed / Constrained", 1984000.0, 71, 6.5, 2.4, 14.0),
+        ("LAND-MP-59218", "nashik_organic_agro", "Malwa Plateau Deep Soil Plantation Zone", "Indore, MP", 15.0, 22.7196, 75.8577, "Black soil", "Moderate (Borewell)", 5850000.0, 79, 8.4, 0.8, 7.1),
+        ("LAND-TS-67104", "coimbatore_orchards", "Warangal Semi-Arid Carbon Restoration Plot", "Warangal, TS", 10.5, 17.9689, 79.5941, "Red soil", "Rainfed / Seasonal Tank", 3045000.0, 74, 7.1, 1.6, 11.2),
     ]
 
-    for lid, owner, title, loc, area, lat, lon, soil, water, price, health, carbon in lands:
+    for lid, owner, title, loc, area, lat, lon, soil, water, price, health, carbon, r_km, m_km in lands:
         c.execute("""
-            INSERT INTO lands (land_id, owner_user_id, title, location, area_hectares, latitude, longitude, soil_type, water_availability, asking_price_inr, land_health_score, carbon_potential, status, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)
-        """, (lid, owner, title, loc, area, lat, lon, soil, water, price, health, carbon, now))
+            INSERT INTO lands (land_id, owner_user_id, title, location, area_hectares, latitude, longitude, soil_type, water_availability, asking_price_inr, land_health_score, carbon_potential, distance_to_road_km, distance_to_market_km, status, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)
+        """, (lid, owner, title, loc, area, lat, lon, soil, water, price, health, carbon, r_km, m_km, now))
 
     # Real subscriptions
     c.execute("""
@@ -405,11 +427,13 @@ def create_land_listing(
     title: str,
     location: str,
     area_hectares: float,
-    soil_type: str,
-    water_availability: str,
-    asking_price_inr: float,
+    soil_type: Optional[str] = None,
+    water_availability: str = "Moderate",
+    asking_price_inr: float = 2500000.0,
     latitude: Optional[float] = None,
     longitude: Optional[float] = None,
+    distance_to_road_km: Optional[float] = None,
+    distance_to_market_km: Optional[float] = None,
 ) -> Dict[str, Any]:
     conn = get_db_connection()
     c = conn.cursor()
@@ -421,23 +445,59 @@ def create_land_listing(
     unique_suffix = f"{int(datetime.utcnow().timestamp()) % 100000:05d}"
     land_id = f"LAND-{loc_prefix}-{unique_suffix}"
 
-    # Calculate real Land Health Score based on soil and water
-    base_health = 75
-    if "black" in soil_type.lower():
-        base_health += 8
-    elif "alluvial" in soil_type.lower():
-        base_health += 12
-    if "abundant" in water_availability.lower():
-        base_health += 8
-    elif "moderate" in water_availability.lower():
-        base_health += 4
-    land_health = min(98, max(50, base_health))
+    # Auto-resolve geospatial enrichment if coordinates are provided
+    geospatial_meta = None
+    resolved_road_km = distance_to_road_km or 1.0
+    resolved_market_km = distance_to_market_km or 6.0
+    resolved_soil = soil_type or "Black Vertisol"
+    resolved_ph = 7.4
+    resolved_soc = 0.85
+
+    if latitude is not None and longitude is not None:
+        try:
+            from src.geospatial.enricher import enrich_geospatial_point
+            enriched = enrich_geospatial_point(latitude, longitude)
+            geospatial_meta = enriched
+            if not soil_type:
+                resolved_soil = enriched.get("soil_type", resolved_soil)
+            if distance_to_road_km is None:
+                resolved_road_km = float(enriched.get("distance_to_road_km", resolved_road_km))
+            if distance_to_market_km is None:
+                resolved_market_km = float(enriched.get("distance_to_market_km", resolved_market_km))
+            resolved_ph = float(enriched.get("soil_ph", resolved_ph))
+            resolved_soc = float(enriched.get("organic_carbon_pct", resolved_soc))
+        except Exception:
+            pass
+
+    # Calculate real Land Health Score v2 with empirical factors
+    from src.scoring.health_scorer_v2 import calculate_land_health_score_v2
+    health_v2 = calculate_land_health_score_v2(
+        soil_type=resolved_soil,
+        soil_ph=resolved_ph,
+        organic_carbon_pct=resolved_soc,
+        water_availability=water_availability,
+        climate_risk_score=4.5,
+        distance_to_road_km=resolved_road_km,
+        distance_to_market_km=resolved_market_km,
+        vegetation_score=75.0,
+    )
+    land_health = health_v2["land_health_score"]
     carbon_pot = round(min(9.8, max(6.0, 7.0 + (land_health / 40.0))), 1)
 
     c.execute("""
-        INSERT INTO lands (land_id, owner_user_id, title, location, area_hectares, latitude, longitude, soil_type, water_availability, asking_price_inr, land_health_score, carbon_potential, status, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)
-    """, (land_id, clean_uid, title, location, area_hectares, latitude, longitude, soil_type, water_availability, asking_price_inr, land_health, carbon_pot, now))
+        INSERT INTO lands (
+            land_id, owner_user_id, title, location, area_hectares,
+            latitude, longitude, soil_type, water_availability, asking_price_inr,
+            land_health_score, carbon_potential, distance_to_road_km, distance_to_market_km,
+            geospatial_data_json, status, created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)
+    """, (
+        land_id, clean_uid, title, location, area_hectares,
+        latitude, longitude, resolved_soil, water_availability, asking_price_inr,
+        land_health, carbon_pot, resolved_road_km, resolved_market_km,
+        json.dumps(geospatial_meta) if geospatial_meta else None, now
+    ))
 
     # Update user's verified area in user table
     c.execute("""

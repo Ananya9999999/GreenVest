@@ -40,6 +40,10 @@ class LandInput(BaseModel):
     vegetation_score: Optional[float] = 75.0
     terrain_score: Optional[float] = 80.0
     climate_risk: Optional[float] = 4.5  # 0–10
+    distance_to_road_km: Optional[float] = 1.0
+    distance_to_market_km: Optional[float] = 6.0
+    soil_ph: Optional[float] = 7.4
+    organic_carbon_pct: Optional[float] = 0.85
 
 
 class SmartLandAnalysis(BaseModel):
@@ -185,10 +189,54 @@ class StrategyComparisonEngine(BaseModel):
     recommendation_rationale: str
 
 
+class HealthScoreV2Factor(BaseModel):
+    name: str
+    score: float
+    max_score: int
+    weight_percent: int
+    detail: str
+
+
+class HealthScoreV2Breakdown(BaseModel):
+    land_health_score: int
+    grade: str
+    verdict: str
+    factors: List[HealthScoreV2Factor]
+    soil_score: float
+    water_score: float
+    climate_score: float
+    proximity_score: float
+    vegetation_score: float
+
+
+class GeospatialEnrichResponse(BaseModel):
+    grid_cell: str
+    latitude: float
+    longitude: float
+    soil_type: str
+    soil_texture: str
+    soil_ph: float
+    organic_carbon_pct: float
+    clay_fraction: float
+    sand_fraction: float
+    silt_fraction: float
+    soil_suitability: str
+    distance_to_road_km: float
+    nearest_road_type: str
+    distance_to_market_km: float
+    nearest_market_name: str
+    bhuvan_context: Dict[str, Any]
+    sources: List[str]
+    from_cache: bool
+    timestamp: str
+
+
 class AdvisorResult(BaseModel):
     land_id: str
     smart_land: SmartLandAnalysis
     greenscore: GreenScore
+    health_score_v2: Optional[HealthScoreV2Breakdown] = None
+    geospatial_enrichment: Optional[GeospatialEnrichResponse] = None
     nature_impact: NatureImpactScore
     strategies: List[StrategyRecommendation]
     carbon_forecasts: List[CarbonForecast]
@@ -286,6 +334,9 @@ class MarketplaceLandItem(BaseModel):
     asking_price_inr: float
     land_health_score: int
     carbon_potential: float
+    distance_to_road_km: Optional[float] = 1.0
+    distance_to_market_km: Optional[float] = 6.0
+    geospatial_sources: Optional[List[str]] = None
     status: str = "active"
     created_at: str
 
@@ -297,9 +348,11 @@ class CreateLandRequest(BaseModel):
     area_hectares: float
     latitude: Optional[float] = None
     longitude: Optional[float] = None
-    soil_type: str = "Black soil"
+    soil_type: Optional[str] = None
     water_availability: str = "Moderate"
     asking_price_inr: float = 2500000.0
+    distance_to_road_km: Optional[float] = None
+    distance_to_market_km: Optional[float] = None
 
 
 class SubscriptionRequest(BaseModel):

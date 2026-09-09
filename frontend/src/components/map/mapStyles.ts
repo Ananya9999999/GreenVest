@@ -13,6 +13,8 @@ export interface MapMarkerData {
   area?: number;
   soil?: string;
   title?: string;
+  distance_to_road_km?: number;
+  distance_to_market_km?: number;
 }
 
 /**
