@@ -73,7 +73,7 @@ function AnalyzeContent() {
   const [simulating, setSimulating] = useState(false);
 
   // 5. Chat Assistant state
-  const [chatOpen, setChatOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(true); // always-visible panel; toggle still allowed
   const [chatMessages, setChatMessages] = useState<{ role: string; text: string }[]>([
     {
       role: "bot",
@@ -1283,107 +1283,98 @@ function AnalyzeContent() {
           </motion.div>
         )}
 
-        {/* FLOATING AI CHAT TRIGGER */}
-        <button
-          type="button"
-          onClick={() => setChatOpen(true)}
-          className="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-olive-800 text-cream-50 shadow-2xl transition hover:scale-105 hover:bg-olive-700 active:scale-95"
-          aria-label="Open AI assistant"
+        
+        {/* STATIC AI CHAT PANEL — fixed on viewport, always available */}
+        <aside
+          className={`fixed top-20 right-4 z-40 flex h-[calc(100vh-6rem)] max-h-[calc(100vh-6rem)] w-[min(100vw-1.5rem,360px)] flex-col overflow-hidden rounded-2xl border border-olive-200 bg-white shadow-2xl transition-transform duration-300 ${
+            chatOpen ? "translate-x-0" : "translate-x-[120%]"
+          }`}
         >
-          <MessageCircle className="h-6 w-6" />
-        </button>
-
-        {/* CHAT DRAWER */}
-        <AnimatePresence>
-          {chatOpen && (
-            <motion.div
-              initial={{ opacity: 0, y: 40, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 20, scale: 0.95 }}
-              className="fixed bottom-24 right-6 z-50 flex h-[480px] w-[350px] flex-col overflow-hidden rounded-2xl border border-olive-200 bg-white shadow-2xl sm:w-[400px]"
+          <div className="flex shrink-0 items-center justify-between bg-olive-900 px-4 py-3 text-cream-50">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-cream-300" />
+              <span className="text-sm font-semibold">GreenVest AI Assistant</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setChatOpen(false)}
+              className="rounded p-1 text-cream-300 hover:text-white"
+              aria-label="Minimize chat"
             >
-              <div className="flex items-center justify-between bg-olive-900 px-4 py-3 text-cream-50">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-cream-300" />
-                  <span className="font-semibold text-sm">GreenVest AI Assistant</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setChatOpen(false)}
-                  className="rounded p-1 text-cream-300 hover:text-white"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
+              <X className="h-4 w-4" />
+            </button>
+          </div>
 
-              {/* Chat messages */}
-              <div className="flex-1 space-y-3 overflow-y-auto p-4">
-                {chatMessages.map((m, i) => (
-                  <div
-                    key={i}
-                    className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-xs leading-relaxed ${
-                      m.role === "user"
-                        ? "ml-auto bg-olive-800 text-cream-50"
-                        : "bg-cream-100 text-olive-900"
-                    }`}
-                  >
-                    <p className="whitespace-pre-line">{m.text}</p>
-                  </div>
-                ))}
-                {chatLoading && (
-                  <div className="max-w-[85%] rounded-2xl bg-cream-100 px-3.5 py-2.5 text-xs text-olive-600">
-                    Thinking and consulting land models...
-                  </div>
-                )}
+          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
+            {chatMessages.map((m, i) => (
+              <div
+                key={i}
+                className={`max-w-[90%] rounded-2xl px-3 py-2 text-sm ${
+                  m.role === "user"
+                    ? "ml-auto bg-olive-800 text-cream-50"
+                    : "bg-cream-100 text-olive-900"
+                }`}
+              >
+                {m.text}
               </div>
+            ))}
+            {chatLoading && (
+              <div className="rounded-2xl bg-cream-100 px-3 py-2 text-sm text-olive-600">
+                Thinking…
+              </div>
+            )}
+          </div>
 
-              {/* Quick Prompt Chips */}
-              <div className="border-t border-olive-100 bg-cream-50/70 p-2 flex gap-1 overflow-x-auto text-[11px]">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setChatInput("Why did you recommend this strategy?");
-                  }}
-                  className="whitespace-nowrap rounded-full bg-white px-2 py-1 border border-olive-200 text-olive-800 hover:bg-olive-50"
-                >
-                  Why recommend?
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setChatInput("What are the ROI and break-even timelines?");
-                  }}
-                  className="whitespace-nowrap rounded-full bg-white px-2 py-1 border border-olive-200 text-olive-800 hover:bg-olive-50"
-                >
-                  ROI & Break-even?
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setChatInput("How many trees and what density?");
-                  }}
-                  className="whitespace-nowrap rounded-full bg-white px-2 py-1 border border-olive-200 text-olive-800 hover:bg-olive-50"
-                >
-                  Tree density?
-                </button>
-              </div>
+          <div className="flex shrink-0 flex-wrap gap-1.5 border-t border-olive-100 bg-cream-50/50 px-3 py-2">
+            <button
+              type="button"
+              onClick={() => setChatInput("Why did you recommend this strategy?")}
+              className="rounded-full border border-olive-200 bg-white px-2 py-1 text-[11px] text-olive-800 hover:bg-olive-50"
+            >
+              Why recommend?
+            </button>
+            <button
+              type="button"
+              onClick={() => setChatInput("What are the ROI and break-even timelines?")}
+              className="rounded-full border border-olive-200 bg-white px-2 py-1 text-[11px] text-olive-800 hover:bg-olive-50"
+            >
+              ROI & break-even?
+            </button>
+            <button
+              type="button"
+              onClick={() => setChatInput("How many trees and what density?")}
+              className="rounded-full border border-olive-200 bg-white px-2 py-1 text-[11px] text-olive-800 hover:bg-olive-50"
+            >
+              Tree density?
+            </button>
+          </div>
 
-              {/* Chat Input */}
-              <div className="flex gap-2 border-t border-olive-100 p-3">
-                <input
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
-                  placeholder="Ask about this land, trees, ROI..."
-                  className="flex-1 rounded-full border border-olive-200 px-3.5 py-2 text-xs text-olive-900 outline-none focus:border-olive-500"
-                />
-                <Button size="sm" onClick={handleSendMessage} disabled={chatLoading}>
-                  Send
-                </Button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+          <div className="flex shrink-0 gap-2 border-t border-olive-100 bg-white p-3">
+            <input
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
+              placeholder="Ask about this land, trees, ROI..."
+              className="min-w-0 flex-1 rounded-full border border-olive-200 px-3.5 py-2 text-xs text-olive-900 outline-none focus:border-olive-500"
+            />
+            <Button size="sm" onClick={handleSendMessage} disabled={chatLoading}>
+              Send
+            </Button>
+          </div>
+        </aside>
+
+        {/* Re-open chip when panel minimized */}
+        {!chatOpen && (
+          <button
+            type="button"
+            onClick={() => setChatOpen(true)}
+            className="fixed bottom-6 right-6 z-40 flex items-center gap-2 rounded-full bg-olive-800 px-4 py-3 text-sm font-semibold text-cream-50 shadow-2xl transition hover:bg-olive-700"
+          >
+            <MessageCircle className="h-5 w-5" />
+            AI Assistant
+          </button>
+        )}
+
       </div>
     </div>
   );

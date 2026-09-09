@@ -257,9 +257,10 @@ export default function MarketplacePage() {
 
   const handleSelectLandFromMap = (landId: string) => {
     setSelectedLandId(landId);
+    // Keep selection in sticky side panel — no scroll jump
     const element = document.getElementById(`land-card-${landId}`);
     if (element) {
-      element.scrollIntoView({ behavior: "smooth", block: "center" });
+      element.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
   };
 
@@ -559,6 +560,16 @@ export default function MarketplacePage() {
                             <span>Run AI Audit</span>
                             <ExternalLink className="h-3 w-3" />
                           </Link>
+
+                          {(user?.subscription_tier === "corporate_access" || user?.user_type === "corporate") && (
+                            <Link
+                              href={`/simulate?land_id=${encodeURIComponent(item.land_id)}&location=${encodeURIComponent(item.location)}&area=${item.area_hectares}&soil=${encodeURIComponent(item.soil_type)}&owner=${encodeURIComponent(item.owner_user_id)}&health=${item.land_health_score}`}
+                              className="col-span-2 flex items-center justify-center gap-1.5 rounded-xl border border-brown-400 bg-gradient-to-r from-olive-50 to-cream-100 py-2 text-xs font-semibold text-olive-900 transition hover:from-olive-100 hover:to-cream-200"
+                            >
+                              <LayoutGrid className="h-3.5 w-3.5 text-brown-600" />
+                              Corporate simulation · Area plan
+                            </Link>
+                          )}
                         </div>
                       </motion.div>
                     );
@@ -615,6 +626,60 @@ export default function MarketplacePage() {
                     <span>Click pin to inspect parcel</span>
                   </div>
 
+                  
+                  {/* Selected land detail — always in view under map */}
+                  {selectedLandId && (() => {
+                    const sel = filteredLands.find((l) => l.land_id === selectedLandId) || lands.find((l) => l.land_id === selectedLandId);
+                    if (!sel) return null;
+                    return (
+                      <div className="mt-4 rounded-2xl border border-olive-200 bg-white p-4 shadow-sm">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-brown-500">{sel.land_id}</p>
+                            <h3 className="truncate font-semibold text-olive-950">{sel.title}</h3>
+                            <p className="text-xs text-olive-600">{sel.location} · @{sel.owner_user_id}</p>
+                          </div>
+                          <span className="shrink-0 rounded-full bg-olive-100 px-2.5 py-1 text-xs font-bold text-olive-800">
+                            {sel.land_health_score}
+                          </span>
+                        </div>
+                        <div className="mt-3 grid grid-cols-3 gap-2 text-[11px] text-olive-700">
+                          <div><span className="text-olive-500">Area</span><p className="font-semibold text-olive-900">{sel.area_hectares} ha</p></div>
+                          <div><span className="text-olive-500">Soil</span><p className="font-semibold text-olive-900">{sel.soil_type}</p></div>
+                          <div><span className="text-olive-500">Carbon</span><p className="font-semibold text-olive-900">{sel.carbon_potential}</p></div>
+                        </div>
+                        <div className="mt-3 grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMessageTarget(sel);
+                              setMessageContent(`Hi @${sel.owner_user_id}, I saw your listing for ${sel.land_id} (${sel.title}) on GreenVest. I would like to discuss a potential partnership.`);
+                            }}
+                            className="flex items-center justify-center gap-1.5 rounded-xl border border-olive-300 bg-white py-2 text-xs font-semibold text-olive-800 hover:bg-olive-50"
+                          >
+                            <MessageSquare className="h-3.5 w-3.5" />
+                            Message
+                          </button>
+                          <Link
+                            href={`/analyze?location=${encodeURIComponent(sel.location)}&area=${sel.area_hectares}&soil=${encodeURIComponent(sel.soil_type)}`}
+                            className="flex items-center justify-center gap-1.5 rounded-xl bg-olive-800 py-2 text-xs font-semibold text-cream-50 hover:bg-olive-700"
+                          >
+                            Analyze
+                          </Link>
+                          {(user?.subscription_tier === "corporate_access" || user?.user_type === "corporate") && (
+                            <Link
+                              href={`/simulate?land_id=${encodeURIComponent(sel.land_id)}&location=${encodeURIComponent(sel.location)}&area=${sel.area_hectares}&soil=${encodeURIComponent(sel.soil_type)}&owner=${encodeURIComponent(sel.owner_user_id)}&health=${sel.land_health_score}`}
+                              className="col-span-2 flex items-center justify-center gap-1.5 rounded-xl border border-brown-400 bg-gradient-to-r from-olive-50 to-cream-100 py-2 text-xs font-semibold text-olive-900 hover:from-olive-100"
+                            >
+                              <LayoutGrid className="h-3.5 w-3.5 text-brown-600" />
+                              Simulate area plan
+                            </Link>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                   <div className="mt-3 rounded-xl bg-cream-50/80 p-2.5 text-[10px] text-olive-600 border border-olive-100 flex items-center justify-between">
                     <span>
                       🌐 <strong>Geospatial Sources:</strong> ISRIC SoilGrids v2.0 · OpenStreetMap Overpass · ISRO Bhuvan
@@ -626,100 +691,100 @@ export default function MarketplacePage() {
             </div>
           )}
 
-          {/* Direct Messaging Modal */}
+          
+          {/* Sticky selected-land + DM panel (viewport-fixed, no page scroll needed) */}
           <AnimatePresence>
             {messageTarget && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  className="w-full max-w-lg rounded-2xl border border-olive-200 bg-white p-6 shadow-xl"
-                >
-                  <div className="flex items-start justify-between border-b border-olive-100 pb-4">
-                    <div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-olive-500">
-                        Peer-to-Peer Direct Message
-                      </span>
-                      <h2 className="text-base font-bold text-olive-950">
-                        Message @{messageTarget.owner_user_id}
-                      </h2>
-                      <p className="text-xs text-olive-600">
-                        Ref: {messageTarget.land_id} · {messageTarget.location}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setMessageTarget(null)}
-                      className="rounded-lg p-1 text-olive-400 hover:bg-olive-100 hover:text-olive-700"
-                    >
-                      <X className="h-5 w-5" />
-                    </button>
+              <motion.aside
+                initial={{ x: 24, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                exit={{ x: 24, opacity: 0 }}
+                transition={{ duration: 0.25 }}
+                className="fixed top-20 bottom-4 right-4 z-50 flex h-[calc(100vh-6rem)] max-h-[calc(100vh-6rem)] w-[min(100vw-2rem,380px)] flex-col overflow-hidden rounded-2xl border border-olive-200 bg-white shadow-2xl"
+              >
+                <div className="flex items-start justify-between border-b border-olive-100 bg-olive-900 px-4 py-3 text-cream-50">
+                  <div className="min-w-0">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-cream-300">
+                      Direct message
+                    </span>
+                    <h2 className="truncate text-sm font-bold">
+                      @{messageTarget.owner_user_id}
+                    </h2>
+                    <p className="truncate text-[11px] text-cream-200/90">
+                      {messageTarget.land_id} · {messageTarget.location}
+                    </p>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setMessageTarget(null)}
+                    className="rounded-lg p-1 text-cream-300 hover:bg-olive-800 hover:text-white"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
 
-                  {messageSentSuccess ? (
-                    <div className="py-8 text-center">
-                      <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-600" />
-                      <h3 className="mt-2 text-sm font-bold text-olive-950">Message Sent Directly!</h3>
-                      <p className="mt-1 text-xs text-olive-600">
-                        Delivered to @{messageTarget.owner_user_id}&apos;s dashboard inbox.
-                      </p>
-                    </div>
-                  ) : (
-                    <form onSubmit={handleSendMessage} className="mt-4 space-y-4 text-xs">
-                      <div>
-                        <label className="mb-1 block font-semibold text-olive-900">
-                          Sending From:
-                        </label>
-                        <div className="rounded-xl border border-olive-200 bg-cream-50/50 px-3 py-2 text-xs font-semibold text-olive-800">
-                          @{user?.user_id || "guest"} ({user?.name || "Guest"})
-                        </div>
+                <div className="shrink-0 border-b border-olive-100 bg-cream-50/80 px-4 py-3 text-xs text-olive-800">
+                  <p className="font-semibold text-olive-950">{messageTarget.title}</p>
+                  <p className="mt-1">
+                    Health {messageTarget.land_health_score} · {messageTarget.area_hectares} ha · {messageTarget.soil_type}
+                  </p>
+                </div>
+
+                {messageSentSuccess ? (
+                  <div className="flex min-h-0 flex-1 flex-col items-center justify-center p-6 text-center">
+                    <CheckCircle2 className="h-12 w-12 text-emerald-600" />
+                    <h3 className="mt-2 text-sm font-bold text-olive-950">Message sent</h3>
+                    <p className="mt-1 text-xs text-olive-600">
+                      Delivered to @{messageTarget.owner_user_id}
+                    </p>
+                    <Button type="button" className="mt-4" onClick={() => setMessageTarget(null)}>
+                      Close
+                    </Button>
+                  </div>
+                ) : (
+                  <form onSubmit={handleSendMessage} className="flex min-h-0 flex-1 flex-col text-xs">
+                    {/* Scrollable middle only */}
+                    <div className="min-h-0 flex-1 overflow-y-auto p-4">
+                      <label className="mb-1 block font-semibold text-olive-900">From</label>
+                      <div className="mb-3 rounded-xl border border-olive-200 bg-cream-50 px-3 py-2 font-semibold text-olive-800">
+                        @{user?.user_id || "guest"}
                       </div>
-
-                      <div>
-                        <label className="mb-1 block font-semibold text-olive-900">
-                          Direct Message / Proposal:
-                        </label>
-                        <textarea
-                          required
-                          rows={4}
-                          value={messageContent}
-                          onChange={(e) => setMessageContent(e.target.value)}
-                          placeholder="State your investment model, lease proposal, or verification questions..."
-                          className="w-full rounded-xl border border-olive-200 bg-cream-50/30 p-3 text-xs text-olive-950 outline-none transition focus:border-olive-600 focus:bg-white"
-                        />
-                      </div>
-
+                      <label className="mb-1 block font-semibold text-olive-900">Message</label>
+                      <textarea
+                        required
+                        value={messageContent}
+                        onChange={(e) => setMessageContent(e.target.value)}
+                        rows={5}
+                        className="w-full resize-none rounded-xl border border-olive-200 bg-white px-3 py-2 text-olive-900 outline-none focus:border-olive-600 focus:ring-2 focus:ring-olive-100"
+                      />
                       {messageError && (
-                        <div className="flex items-center gap-2 rounded-xl bg-red-50 p-2.5 text-xs text-red-700 border border-red-100">
+                        <div className="mt-3 flex items-center gap-2 rounded-xl border border-red-100 bg-red-50 p-2.5 text-red-700">
                           <AlertCircle className="h-4 w-4 shrink-0" />
                           <span>{messageError}</span>
                         </div>
                       )}
-
-                      <div className="flex items-center justify-end gap-2 pt-2">
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          onClick={() => setMessageTarget(null)}
-                        >
-                          Cancel
+                    </div>
+                    {/* Pinned send bar — always visible */}
+                    <div className="shrink-0 border-t border-olive-100 bg-white p-3">
+                      <div className="flex gap-2">
+                        <Button type="button" variant="secondary" className="flex-1" onClick={() => setMessageTarget(null)}>
+                          Close
                         </Button>
-                        <Button type="submit" disabled={sendingMessage}>
-                          {sendingMessage ? "Sending..." : "Send Message →"}
+                        <Button type="submit" className="flex-1" disabled={sendingMessage}>
+                          {sendingMessage ? "Sending..." : "Send →"}
                         </Button>
                       </div>
-                    </form>
-                  )}
-                </motion.div>
-              </div>
+                    </div>
+                  </form>
+                )}
+              </motion.aside>
             )}
           </AnimatePresence>
 
-          {/* List Land Modal (with Coordinates & Subscription Gate) */}
+{/* List Land Modal (with Coordinates & Subscription Gate) */}
           <AnimatePresence>
             {isListingModalOpen && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+              <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 pt-24 backdrop-blur-sm">
                 <motion.div
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
@@ -961,7 +1026,7 @@ export default function MarketplacePage() {
           {/* Payment Success Modal */}
           <AnimatePresence>
             {paymentSuccessData && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+              <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 pt-24 backdrop-blur-sm">
                 <motion.div
                   initial={{ opacity: 0, scale: 0.92 }}
                   animate={{ opacity: 1, scale: 1 }}
