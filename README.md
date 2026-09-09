@@ -2,9 +2,9 @@
 
 **Land intelligence for investors and landowners.**
 
-GreenVest helps users discover land opportunities, understand environmental conditions through satellite and live data, and make data-driven decisions about the best way to invest — for both financial returns and climate impact.
+GreenVest helps users discover land opportunities, understand environmental conditions through satellite and live weather data, and make data-driven decisions about the best way to invest — for both financial returns and climate impact.
 
-> *We didn’t add three features — we gave the same recommendation engine three more real-world inputs: what the land actually is, what it’s near, and what the weather is about to do.*
+> We didn’t add three features — we gave the same recommendation engine three more real-world inputs: what the land actually is, what it’s near, and what the weather is about to do.
 
 ---
 
@@ -17,211 +17,192 @@ GreenVest helps users discover land opportunities, understand environmental cond
 | **Land Health Score** | Soil, water, climate, vegetation, terrain, proximity |
 | **Smart Data Layer** | Soil classification, budget constraints, planting-window alerts |
 | **Personalized Preferences** | Weight carbon, ROI, risk, biodiversity, water efficiency |
-| **AI Land Advisor** | Top 3 plantation strategies tailored to land + user goals |
+| **AI Land Advisor** | Top 3 plantation strategies with detailed crop/tree mixes and area allocation |
+| **Live Weather + Planting Windows** | Real Open-Meteo forecast → “Plant now” / “Wait” / “Caution” signals |
 | **Carbon & Investment Analysis** | Sequestration forecasts, credit potential, cost calculator, climate risk |
-| **Live Weather Alerts** | “Plant now” / “wait” signals via app + WhatsApp |
-| **AI Chatbot** | Context-aware guidance on the land and recommendations |
+| **AI Chatbot** | Context-aware guidance on strategies, ROI, weather, and land health |
 | **Monitoring** | Track vegetation growth, carbon accumulation, land health |
 
 ---
 
-## Core Product Idea
+## New Features (Recent)
 
-GreenVest combines:
+### 1. Live Weather API + Real Planting-Window Alerts
+- Uses **Open-Meteo** (free, no API key) for 7-day forecasts
+- Inputs: latitude & longitude from the land record
+- Pulls: precipitation, temperature min/max, soil moisture, wind
+- Planting-window engine produces:
+  - `plant_now` | `wait` | `caution`
+  - Window start/end dates
+  - Clear human messages (“Plant now” / “Wait 4–6 days — heavy rain risk”)
+- Cached (1–3 hours) to avoid rate limits
+- Graceful fallback if the weather API is down
+- Badge shown on **Analyze** and **Dashboard** pages
+- Status also feeds into the chatbot
 
-- **Land discovery** (own land + marketplace)
-- **Geospatial intelligence** (ISRO / satellite + soil + proximity)
-- **Live weather** (planting windows)
-- **AI decision-making** (ranked strategies)
-- **Climate impact + investment analysis**
+**Endpoints:**
+- `GET /api/weather?lat=&lon=`
+- `GET /api/weather/{land_id}`
+- `GET /api/planting-window?lat=&lon=&strategy=`
+- `GET /api/weather-and-windows?lat=&lon=`
 
-into one platform that supports both **financial returns** and **climate impact**.
+### 2. Elaborate Plantation Strategies
+Strategies are no longer generic. Each recommendation now includes:
+
+- Exact crops / trees / species to plant
+- Area allocation (hectares + acres + %)
+- Purpose of each block (short-cycle cash / long-term timber / soil building)
+- Expected cash-flow cycle
+- Detailed planting plan written for the user’s budget, area, soil and goals
+
+**Example (5 acres + ₹5 Lakh budget, wants money every 4 months + long-term investment):**
+
+| Strategy | Allocation |
+|----------|------------|
+| **Balanced** | 1.5 acres → Amla / Moringa / Guava + legumes<br>2.5 acres → Teak / Mahogany + bamboo<br>1.0 acre → Understory legumes / fodder |
+| **Maximum ROI** | 1.3 acres → Maize + Lablab (or Turmeric/Ginger)<br>3.7 acres → Commercial bamboo |
+| **Maximum Carbon** | 0.7 acres → Nitrogen-fixing nurse species<br>4.3 acres → Native hardwoods + clumping bamboo |
+
+### 3. Optional Grok-Powered Strategy Refinement
+- When `XAI_API_KEY` is set, the advisor can call the xAI Grok API to further refine species mix, area splits and recommendation reasons.
+- Completely optional — falls back to the strong rule-based engine if the key is missing.
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|------------|
+| Frontend | Next.js 14 (App Router), TypeScript, Tailwind CSS, Framer Motion |
+| Backend | FastAPI, Pydantic, SQLite |
+| Weather | Open-Meteo Forecast API |
+| AI (optional) | xAI Grok API |
+| Maps | Leaflet / satellite layers |
+| Payments | Razorpay + UPI |
+
+---
+
+## Project Structure
+
+```
+GreenVest/
+├── backend/
+│   ├── src/
+│   │   ├── advisor/          # Strategy generation + ranking
+│   │   ├── api/              # FastAPI routes
+│   │   ├── chatbot/          # Context-aware assistant
+│   │   ├── services/
+│   │   │   ├── weather.py    # Open-Meteo + planting windows
+│   │   │   └── grok_advisor.py
+│   │   ├── models/           # Pydantic schemas
+│   │   └── ...
+│   └── requirements.txt
+├── frontend/
+│   ├── src/
+│   │   ├── app/
+│   │   │   ├── analyze/      # Main strategy + weather badge page
+│   │   │   ├── auth/         # Sign-in / Register
+│   │   │   ├── dashboard/
+│   │   │   └── ...
+│   │   ├── components/
+│   │   │   └── weather/      # PlantingStatusBadge
+│   │   └── ...
+│   └── package.json
+├── LICENSE
+└── README.md
+```
+
+---
+
+## Getting Started
+
+### Backend
+
+```bash
+cd backend
+python -m venv venv
+source venv/bin/activate          # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+
+# Optional: enable Grok-enhanced strategies
+export XAI_API_KEY=your_xai_api_key
+
+uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8000
+```
+
+API docs: http://localhost:8000/docs
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open http://localhost:3000
+
+---
+
+## Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `XAI_API_KEY` | No | xAI Grok API key for richer strategy generation |
+| `GROK_MODEL` | No | Defaults to `grok-3-mini` |
+| `NEXT_PUBLIC_API_URL` | No | Backend URL (defaults to `http://localhost:8000`) |
+| `RAZORPAY_KEY_ID` | No | For payments |
+| `RAZORPAY_KEY_SECRET` | No | For payments |
+
+---
+
+## Key API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/analyze` | Full land analysis + top 3 strategies |
+| GET | `/api/weather` | Live 7-day forecast |
+| GET | `/api/planting-window` | Plant now / Wait / Caution signal |
+| GET | `/api/weather-and-windows` | Forecast + all strategy windows |
+| POST | `/api/auth/register` | Create account |
+| POST | `/api/auth/login` | Sign in |
+| POST | `/api/chat` | Context-aware chatbot |
 
 ---
 
 ## User Flow
 
 ```
-ENTER LOCATION / SELECT LAND (Own or Marketplace)
-           ↓
-LAND CLASSIFICATION + VISUALIZATION
-2D + 3D MAP · Soil type · Proximity
-           ↓
-ISRO / SATELLITE + WEATHER DATA
-           ↓
+ENTER LOCATION / SELECT LAND
+        ↓
+LAND CLASSIFICATION + MAP
+        ↓
+SATELLITE + LIVE WEATHER DATA
+        ↓
 LAND HEALTH SCORE
-           ↓
-SELECT INVESTMENT PRIORITIES + BUDGET
-Carbon · ROI · Risk · Biodiversity · Water
-           ↓
-AI LAND INVESTMENT ANALYSIS
-           ↓
-TOP 3 PLANTATION STRATEGIES
-           ↓
-CARBON FORECAST + CREDIT POTENTIAL
-INVESTMENT COST + ROI ANALYSIS
-           ↓
-PLANTING-WINDOW ALERTS (WhatsApp)
-           ↓
-CHOOSE STRATEGY → MONITOR LAND & IMPACT
+        ↓
+SET PREFERENCES + BUDGET
+        ↓
+AI LAND ADVISOR
+(Top 3 strategies with area allocation)
+        ↓
+CARBON FORECAST + ROI ANALYSIS
+        ↓
+PLANTING-WINDOW ALERTS
+        ↓
+CHOOSE STRATEGY → MONITOR IMPACT
 ```
-
----
-
-## Smart Data Layer
-
-One engine enriched with real-world inputs (not three separate modules):
-
-| Input | What it adds | Feeds into |
-|-------|--------------|------------|
-| **Land Classification** | Soil type (black / sandy / alluvial), barren/fallow/roadside, distance to road/town/market | Land Health Score |
-| **Budget** | Hard constraint on strategy cost and species mix | AI Land Advisor ranking |
-| **Live Weather** | Forecast vs species planting windows → “Plant now” / “Wait” alerts | Chatbot + WhatsApp notifications |
-
-**Powered by**
-
-- ISRO Bhuvan + SoilGrids / NBSS — soil & land classification  
-- OpenStreetMap Overpass API — proximity  
-- Open-Meteo (MVP) / OpenWeatherMap or Weatherbit (production) — weather  
-- Twilio / Gupshup — WhatsApp delivery  
-
----
-
-## Architecture (High Level)
-
-```
-┌─────────────────┐     ┌──────────────────┐     ┌─────────────────────────┐
-│   User Layer    │     │  Application     │     │   Intelligence Layer    │
-│  Web / Mobile   │────▶│  API Gateway     │────▶│  AI Land Advisor         │
-│  Map · Market   │     │  Auth & UserID   │     │  Strategy Ranker         │
-│  Dashboard      │     │  Preference Eng. │     │  Carbon Forecaster       │
-│  Chatbot        │     │  Cost Calculator │     │  Chatbot (RAG)           │
-└─────────────────┘     └────────┬─────────┘     └────────────┬────────────┘
-                                 │                            │
-                                 ▼                            ▼
-                        ┌──────────────────┐     ┌─────────────────────────┐
-                        │  Core Services   │     │   Data & Geospatial     │
-                        │  Land Service    │◀───▶│  ISRO / Satellite APIs  │
-                        │  Marketplace     │     │  Soil · Weather · OSM   │
-                        │  Scoring Engine  │     │  Terrain · Climate      │
-                        └────────┬─────────┘     └─────────────────────────┘
-                                 │
-                                 ▼
-                        ┌──────────────────┐
-                        │  Data Storage    │
-                        │  Users · Parcels │
-                        │  Scores · Alerts │
-                        └──────────────────┘
-```
-
----
-
-## Team Ownership (4 people)
-
-| Person | Focus | Owns |
-|--------|--------|------|
-| **Person 1** | Frontend & Map | UI, interactive map, marketplace screens, preference inputs, strategy cards, dashboard, chatbot UI |
-| **Person 2** | Backend & Core Services | Auth, UserID, Land Service, Marketplace Service, Preference Engine, Cost Calculator, APIs, DB schema |
-| **Person 3** | Geospatial & Scoring | ISRO/satellite integration, soil/land classification, Land Health Score, climate risk, monitoring data, proximity |
-| **Person 4** | AI & Intelligence | AI Land Advisor, Strategy Ranker, Carbon Forecaster, Credit Potential, Chatbot, planting-window logic |
-
----
-
-## MVP Scope
-
-**Must build**
-
-1. Interactive map land selection  
-2. Land Marketplace with listings + UserID  
-3. Location, area, budget, investment horizon inputs  
-4. Satellite / geospatial visualization + soil classification  
-5. Land Health Score  
-6. Weighted investment preferences  
-7. AI land analysis + top 3 strategies  
-8. Carbon sequestration forecast + credit potential  
-9. Investment cost & ROI calculator  
-10. Climate risk analysis  
-11. Live weather → planting-window alerts (app + WhatsApp)  
-12. AI chatbot  
-
-**Strong bonus**
-
-- Interactive Carbon Potential Map  
-- 2D + 3D land visualization  
-- Satellite-based monitoring dashboard  
-
----
-
-## Commercial Path
-
-| Model | Description |
-|-------|-------------|
-| **Freemium** | Basic Land Health Score free; full AI strategies + alerts paid |
-| **Marketplace** | Transaction / listing fees on land opportunities |
-| **B2B** | Agri funds, CSR land programs, institutions |
-| **API** | Partner access to scoring and recommendation engine |
-| **WhatsApp Premium** | Paid planting-window and monitoring alerts |
-| **Carbon facilitation** | Help users navigate credit potential (estimate → action) |
-| **White-label** | Platform for banks, funds, or government programs |
-
-**Goal:** Commercialise the decision layer — turn land intelligence into a product people pay for and partners integrate.
-
----
-
-## Tech Stack (Suggested)
-
-| Layer | Options |
-|-------|---------|
-| Frontend | React / Next.js, Mapbox or Leaflet, 3D (Three.js / Cesium optional) |
-| Backend | Node.js / Python (FastAPI), PostgreSQL + PostGIS |
-| Geospatial | ISRO Bhuvan, SoilGrids / NBSS, OpenStreetMap Overpass |
-| Weather | Open-Meteo (MVP) → OpenWeatherMap / Weatherbit (production) |
-| AI | Python (Pydantic models, ranking engine), LLM + RAG for chatbot |
-| Notifications | Twilio / Gupshup (WhatsApp) |
-| Infra | Cloud (AWS / GCP / Azure), object storage for imagery |
-
----
-
-## Repository Structure (Suggested)
-
-```
-greenvest/
-├── frontend/                 # Person 1
-├── backend/                  # Person 2
-├── geospatial/               # Person 3
-├── ai/                       # Person 4 (see greenvest-ai module)
-├── docs/
-│   └── architecture.md
-├── README.md
-└── ...
-```
-
----
-
-## Getting Started (AI module example)
-
-```bash
-cd ai   # or greenvest-ai
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-PYTHONPATH=. python -m src.advisor.example
-```
-
----
-
-## One-line Pitch
-
-**GreenVest helps investors and landowners discover the potential of land, understand its environmental conditions, and make data-driven decisions about the best way to invest in it for both financial returns and climate impact.**
 
 ---
 
 ## License
 
-[Add your license here]
+This project is licensed under the **MIT License**.  
+See the [LICENSE](LICENSE) file for details.
 
 ---
 
 ## Contact
 
-[Team / org contact]
+Built by **Git Happens**  
+GitHub: [Ananya9999999/GreenVest](https://github.com/Ananya9999999/GreenVest)

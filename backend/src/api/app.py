@@ -3,11 +3,10 @@ FastAPI application exposing the GreenVest AI Land Intelligence and Investment E
 """
 
 from typing import Optional, Dict, Any, List
-from fastapi import FastAPI, HTTPException, Request, Header
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from src.core.config import get_settings
 from src.models.schemas import (
     LandInput,
     PreferenceWeights,
@@ -23,13 +22,8 @@ from src.models.schemas import (
     CreateLandRequest,
     SubscriptionRequest,
     SubscriptionResponse,
-    CreateOrderRequest,
-    CreateOrderResponse,
-    VerifyPaymentRequest,
-    VerifyPaymentResponse,
     SendMessageRequest,
     DirectMessageItem,
-    GeospatialEnrichResponse,
 )
 from src.advisor.advisor import recommend
 from src.advisor.simulator import simulate_scenario
@@ -41,15 +35,11 @@ from src.db.database import (
     get_user_by_id,
     get_user_by_email,
     update_subscription,
-    activate_paid_subscription,
-    get_user_subscriptions,
     get_marketplace_lands,
     create_land_listing,
     send_direct_message,
     get_user_messages,
 )
-from src.services.payment_service import payment_service
-
 
 
 app = FastAPI(
@@ -115,23 +105,6 @@ def health_check():
     }
 
 
-@app.get("/api/geospatial/enrich", response_model=GeospatialEnrichResponse)
-def get_geospatial_enrichment(lat: float, lon: float):
-    """
-    Enriches arbitrary latitude/longitude with real geospatial signals:
-    - ISRIC SoilGrids v2.0 physical pedology (clay/sand/silt/SOC/pH) & NBSS-LUP ICAR fallbacks
-    - OpenStreetMap Overpass proximity (distance to motorable road & mandi/town in km)
-    - ISRO Bhuvan open thematic metadata
-    - High-performance grid-cell caching
-    """
-    try:
-        from src.geospatial.enricher import enrich_geospatial_point
-        enriched = enrich_geospatial_point(lat, lon)
-        return enriched
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Geospatial enrichment failed: {str(e)}")
-
-
 @app.post("/api/analyze", response_model=AdvisorResult)
 def run_analysis(payload: AnalyzePayload):
     try:
@@ -149,21 +122,6 @@ def run_analysis(payload: AnalyzePayload):
                 investment_horizon_years=payload.investment_horizon_years or 15,
                 health_score=payload.health_score or 82.0,
             )
-
-        # Enrich geospatial signals if coordinates are provided
-        if land.latitude is not None and land.longitude is not None:
-            try:
-                from src.geospatial.enricher import enrich_geospatial_point
-                enriched_data = enrich_geospatial_point(land.latitude, land.longitude)
-                if not land.soil_type or land.soil_type == "Black soil":
-                    land.soil_type = enriched_data.get("soil_type", land.soil_type)
-                land.distance_to_road_km = float(enriched_data.get("distance_to_road_km", land.distance_to_road_km or 1.0))
-                land.distance_to_market_km = float(enriched_data.get("distance_to_market_km", land.distance_to_market_km or 6.0))
-                land.soil_ph = float(enriched_data.get("soil_ph", land.soil_ph or 7.4))
-                land.organic_carbon_pct = float(enriched_data.get("organic_carbon_pct", land.organic_carbon_pct or 0.85))
-                setattr(land, "_geospatial_enrichment", enriched_data)
-            except Exception:
-                pass
 
         weights = payload.weights or PreferenceWeights(
             carbon=7.0, roi=7.0, low_risk=6.0, biodiversity=7.0, water_efficiency=6.0
@@ -200,20 +158,37 @@ def chat_assistant(req: ChatMessageRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/api/satellite")
 @app.get("/api/satellite/{land_id}")
-def satellite_data(
-    land_id: Optional[str] = None,
-    lat: Optional[float] = None,
-    lon: Optional[float] = None,
-):
+def satellite_data(land_id: str):
     try:
-        return get_satellite_monitoring_data(land_id=land_id, latitude=lat, longitude=lon)
+        return get_satellite_monitoring_data(land_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 # ------------------- Authentication & User Profile -------------------
+
+
+def _public_user_profile(user: dict) -> dict:
+    """Strip secrets and shape DB row for UserProfileResponse."""
+    factors = user.get("credit_factors")
+    if factors is None and user.get("credit_factors_json"):
+        import json
+        factors = json.loads(user["credit_factors_json"])
+    return {
+        "user_id": user["user_id"],
+        "name": user["name"],
+        "email": user["email"],
+        "user_type": user["user_type"],
+        "credit_score": int(user.get("credit_score") or 0),
+        "credit_tier": user.get("credit_tier") or "",
+        "credit_factors": factors or [],
+        "subscription_tier": user.get("subscription_tier") or "free",
+        "verified_area_ha": float(user.get("verified_area_ha") or 0),
+        "budget_inr": float(user.get("budget_inr") or 0),
+        "created_at": user.get("created_at") or "",
+    }
+
 
 @app.post("/api/auth/register", response_model=UserProfileResponse)
 def register(req: UserRegisterRequest):
@@ -227,7 +202,7 @@ def register(req: UserRegisterRequest):
             verified_area_ha=req.verified_area_ha,
             budget_inr=req.budget_inr,
         )
-        return user
+        return _public_user_profile(user)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -236,47 +211,38 @@ def register(req: UserRegisterRequest):
 
 @app.post("/api/auth/login", response_model=UserProfileResponse)
 def login(req: UserLoginRequest):
-    target = req.email_or_user_id.strip()
-    if "@" in target and "." in target:
+    target = req.email_or_user_id.strip().lstrip("@")
+    user = None
+    # Prefer userid lookup; also try email
+    user = get_user_by_id(target)
+    if not user and "@" in target:
         user = get_user_by_email(target)
-    else:
-        user = get_user_by_id(target)
+    if not user:
+        user = get_user_by_email(target)
 
     if not user:
         raise HTTPException(status_code=404, detail="Account not found. Please check your @userid or email.")
 
-    if user["password_hash"] != req.password:
+    if str(user.get("password_hash") or "") != str(req.password):
         raise HTTPException(status_code=401, detail="Invalid password credentials.")
 
-    return user
+    return _public_user_profile(user)
 
 
 @app.get("/api/auth/user/{user_id}", response_model=UserProfileResponse)
 def get_profile(user_id: str):
-    user = get_user_by_id(user_id)
+    user = get_user_by_id(user_id.strip().lstrip("@"))
     if not user:
         raise HTTPException(status_code=404, detail=f"User @{user_id} not found.")
-    return user
+    return _public_user_profile(user)
 
 
 # ------------------- Marketplace Lands -------------------
 
 @app.get("/api/marketplace/lands", response_model=List[MarketplaceLandItem])
-def list_marketplace_lands(user_id: Optional[str] = None):
+def list_marketplace_lands():
     try:
-        # Check corporate access / paid plan if user_id is provided
-        if user_id:
-            user = get_user_by_id(user_id)
-            if not user:
-                raise HTTPException(status_code=404, detail=f"User @{user_id} not found.")
-            if user["subscription_tier"] == "free":
-                raise HTTPException(
-                    status_code=403,
-                    detail="A Corporate Access Pass (₹9,999) or Landowner Listing Plan is required to load verified marketplace lands.",
-                )
         return get_marketplace_lands()
-    except HTTPException:
-        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -304,10 +270,6 @@ def create_land(req: CreateLandRequest):
             soil_type=req.soil_type,
             water_availability=req.water_availability,
             asking_price_inr=req.asking_price_inr,
-            latitude=req.latitude,
-            longitude=req.longitude,
-            distance_to_road_km=req.distance_to_road_km,
-            distance_to_market_km=req.distance_to_market_km,
         )
         return new_land
     except HTTPException:
@@ -316,124 +278,7 @@ def create_land(req: CreateLandRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ------------------- Real Razorpay Payments -------------------
-
-@app.post("/api/payments/create-order", response_model=CreateOrderResponse)
-def create_payment_order(req: CreateOrderRequest):
-    try:
-        order_data = payment_service.create_order(
-            user_id=req.user_id,
-            plan_type=req.plan_type,
-            amount=req.amount,
-        )
-        return CreateOrderResponse(**order_data)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/api/payments/verify", response_model=VerifyPaymentResponse)
-def verify_payment_checkout(req: VerifyPaymentRequest):
-    try:
-        user = get_user_by_id(req.user_id)
-        if not user:
-            raise HTTPException(status_code=404, detail=f"User @{req.user_id} not found.")
-
-        # Cryptographically verify the signature
-        is_valid = payment_service.verify_payment_signature(
-            razorpay_order_id=req.razorpay_order_id,
-            razorpay_payment_id=req.razorpay_payment_id,
-            razorpay_signature=req.razorpay_signature,
-        )
-
-        if not is_valid:
-            from src.db.database import record_payment_event
-            record_payment_event(
-                event_id=None,
-                event_type="payment.verification_failed",
-                payment_id=req.razorpay_payment_id,
-                order_id=req.razorpay_order_id,
-                user_id=req.user_id,
-                payload_json=f'{{"error": "Invalid signature", "received_sig": "{req.razorpay_signature}"}}',
-                status="rejected",
-            )
-            raise HTTPException(
-                status_code=400,
-                detail="Payment signature verification failed. Untrusted checkout attempt rejected.",
-            )
-
-        settings = get_settings()
-        plan_amount = settings.PLANS.get(req.plan_type, {}).get("price_inr", 1999.0)
-
-        updated_user = activate_paid_subscription(
-            user_id=req.user_id,
-            plan_type=req.plan_type,
-            amount=plan_amount,
-            payment_id=req.razorpay_payment_id,
-            order_id=req.razorpay_order_id,
-        )
-
-        from src.db.database import record_payment_event
-        record_payment_event(
-            event_id=None,
-            event_type="payment.verification_success",
-            payment_id=req.razorpay_payment_id,
-            order_id=req.razorpay_order_id,
-            user_id=req.user_id,
-            payload_json=f'{{"status": "verified", "plan_type": "{req.plan_type}"}}',
-            status="verified",
-        )
-
-        plan_name = settings.PLANS.get(req.plan_type, {}).get("name", req.plan_type)
-        return VerifyPaymentResponse(
-            success=True,
-            user_id=updated_user["user_id"],
-            subscription_tier=updated_user["subscription_tier"],
-            credit_score=updated_user["credit_score"],
-            credit_tier=updated_user["credit_tier"],
-            message=f"Payment verified! Successfully activated {plan_name}. Green Credit score boosted to {updated_user['credit_score']}.",
-            payment_id=req.razorpay_payment_id,
-        )
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/api/payments/webhook")
-async def razorpay_webhook(
-    request: Request,
-    x_razorpay_signature: Optional[str] = Header(None, alias="X-Razorpay-Signature"),
-):
-    """
-    Razorpay Webhook: Single source of truth for payment lifecycle events
-    (payment.captured, order.paid, payment.failed).
-    Works even if user closes browser immediately after checkout.
-    """
-    raw_body = await request.body()
-    try:
-        payload = await request.json()
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid JSON body in webhook")
-
-    if not x_razorpay_signature:
-        raise HTTPException(status_code=400, detail="Missing X-Razorpay-Signature header")
-
-    try:
-        result = payment_service.process_webhook_event(
-            payload=payload,
-            raw_body=raw_body,
-            signature_header=x_razorpay_signature,
-        )
-        return {"status": "ok", "result": result}
-    except ValueError as ve:
-        raise HTTPException(status_code=400, detail=str(ve))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# ------------------- Legacy Subscriptions (Backward Compatibility) -------------------
+# ------------------- Subscriptions -------------------
 
 @app.post("/api/subscription/subscribe", response_model=SubscriptionResponse)
 def activate_subscription(req: SubscriptionRequest):
@@ -484,13 +329,6 @@ def send_message(req: SendMessageRequest):
         if not recipient:
             raise HTTPException(status_code=404, detail=f"Recipient @{req.recipient_user_id} not found.")
 
-        # Gate direct messaging to active paid subscribers
-        if sender["subscription_tier"] == "free":
-            raise HTTPException(
-                status_code=403,
-                detail="A Corporate Access Pass (₹9,999) or Landowner Listing Plan is required to initiate direct landowner messaging.",
-            )
-
         msg = send_direct_message(
             sender_user_id=req.sender_user_id,
             recipient_user_id=req.recipient_user_id,
@@ -502,5 +340,4 @@ def send_message(req: SendMessageRequest):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 

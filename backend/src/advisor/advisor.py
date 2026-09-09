@@ -301,6 +301,11 @@ def _build_strategy(
         breakeven_years=t["breakeven_years"],
     )
 
+    # --- Elaborate area allocation & cashflow narrative ---
+    allocations, detailed_plan, short_term, long_term = _generate_area_allocations(
+        strategy_type, land, t
+    )
+
     return StrategyRecommendation(
         strategy_type=strategy_type,
         title=t["title"],
@@ -316,7 +321,149 @@ def _build_strategy(
         estimated_investment=total_initial,
         expected_roi_percent=t["roi_percent"],
         risk_level=t["risk_level"],
+        area_allocations=allocations,
+        detailed_plan=detailed_plan,
+        short_term_income=short_term,
+        long_term_upside=long_term,
     )
+
+
+def _generate_area_allocations(
+    strategy_type: StrategyType,
+    land: LandInput,
+    template: dict,
+) -> tuple:
+    """
+    Produce concrete area splits so the user sees e.g.
+    'Plant maize + lablab on 1 acre for 4-month cash cycles;
+     timber on remaining 4 acres for 15-20 yr capital gain.'
+    """
+    area_ha = max(0.1, land.area_hectares)
+    budget = land.budget or 500000.0
+    horizon = land.investment_horizon_years or 15
+    soil = (land.soil_type or "Black soil").lower()
+    water = (land.water_availability or "Moderate").lower()
+
+    # Convert to acres for more intuitive Indian landowner messaging (1 ha ≈ 2.47 acre)
+    area_acre = round(area_ha * 2.471, 1)
+
+    if strategy_type == StrategyType.MAX_ROI:
+        # Prioritise short-cycle cash + high-yield bamboo
+        short_frac = 0.25 if area_ha > 1.5 else 0.35
+        short_ha = round(area_ha * short_frac, 2)
+        bamboo_ha = round(area_ha - short_ha, 2)
+        allocations = [
+            {
+                "crop_or_species": "Maize + Lablab (or Turmeric/Ginger intercrop)",
+                "area_hectares": short_ha,
+                "area_acres": round(short_ha * 2.471, 1),
+                "area_percent": round(short_frac * 100, 0),
+                "purpose": "Short-cycle cash flow",
+                "expected_cashflow_cycle": "Every 3–4 months (grain + fodder/legume)",
+                "notes": "Provides working capital while bamboo establishes.",
+            },
+            {
+                "crop_or_species": "Dendrocalamus strictus / Bambusa balcooa (commercial bamboo)",
+                "area_hectares": bamboo_ha,
+                "area_acres": round(bamboo_ha * 2.471, 1),
+                "area_percent": round((1 - short_frac) * 100, 0),
+                "purpose": "High annual harvest revenue from year 4",
+                "expected_cashflow_cycle": "Annual culm thinning + intercrop from year 3–4",
+                "notes": "Primary ROI engine; culms sold for scaffolding, paper, charcoal.",
+            },
+        ]
+        detailed = (
+            f"On your {area_acre} acres ({area_ha} ha) with ~₹{budget:,.0f} budget: "
+            f"allocate ~{allocations[0]['area_acres']} acres to short-cycle maize + lablab "
+            f"(or turmeric/ginger) for income every 3–4 months. Plant commercial bamboo on the remaining "
+            f"{allocations[1]['area_acres']} acres. This mix meets frequent cash needs while building "
+            f"a high-yield perennial asset that starts generating strong annual returns from year 4."
+        )
+        short_term = f"Expect first cash from intercrops within 3–4 months on the {allocations[0]['area_acres']}-acre block."
+        long_term = f"Bamboo block becomes the main profit centre from year 4; cumulative ROI targets {template['roi_percent']}% with breakeven ~{template['breakeven_years']} years."
+
+    elif strategy_type == StrategyType.MAX_CARBON:
+        # Heavy on permanent native forest, small nurse/legume strip
+        nurse_frac = 0.15
+        nurse_ha = round(area_ha * nurse_frac, 2)
+        forest_ha = round(area_ha - nurse_ha, 2)
+        allocations = [
+            {
+                "crop_or_species": "Nitrogen-fixing nurse + understory legumes (Pongamia, Albizia, Stylo)",
+                "area_hectares": nurse_ha,
+                "area_acres": round(nurse_ha * 2.471, 1),
+                "area_percent": round(nurse_frac * 100, 0),
+                "purpose": "Soil building + early biomass",
+                "expected_cashflow_cycle": "Limited; primarily ecological function + possible seed/NTFP later",
+                "notes": "Accelerates soil organic carbon and supports hardwood establishment.",
+            },
+            {
+                "crop_or_species": "Native hardwood mix (Teak, Neem, Terminalia) + clumping bamboo",
+                "area_hectares": forest_ha,
+                "area_acres": round(forest_ha * 2.471, 1),
+                "area_percent": round((1 - nurse_frac) * 100, 0),
+                "purpose": "Maximum permanent carbon sequestration + biodiversity",
+                "expected_cashflow_cycle": "Carbon credits from year 5–7; selective NTFP / thinning later",
+                "notes": "Designed for long-horizon climate + legacy value.",
+            },
+        ]
+        detailed = (
+            f"For maximum carbon on {area_acre} acres: dedicate ~{allocations[1]['area_acres']} acres to a dense native "
+            f"hardwood + bamboo canopy (Teak/Neem/Terminalia + B. tulda). Use the remaining "
+            f"{allocations[0]['area_acres']} acres as a nitrogen-fixing nurse strip to build soil quickly. "
+            f"This configuration maximises tCO2e/ha while still allowing limited early biomass income."
+        )
+        short_term = "Early years focus on establishment; limited cash until carbon credit eligibility (~year 5)."
+        long_term = f"Highest permanent carbon stock and biodiversity score; ROI is secondary but still positive at ~{template['roi_percent']}% with strong climate-asset upside."
+
+    else:  # BALANCED
+        # Classic agroforestry: fruit/cash + timber + understory
+        cash_frac = 0.30
+        timber_frac = 0.50
+        under_frac = 0.20
+        cash_ha = round(area_ha * cash_frac, 2)
+        timber_ha = round(area_ha * timber_frac, 2)
+        under_ha = round(area_ha - cash_ha - timber_ha, 2)
+        allocations = [
+            {
+                "crop_or_species": "Fruit & cash trees (Amla, Moringa, Guava) + seasonal legumes",
+                "area_hectares": cash_ha,
+                "area_acres": round(cash_ha * 2.471, 1),
+                "area_percent": round(cash_frac * 100, 0),
+                "purpose": "Regular seasonal income",
+                "expected_cashflow_cycle": "Every 4–6 months once trees mature (year 2–3 onward)",
+                "notes": "Provides the 'frequent money' stream the user often seeks.",
+            },
+            {
+                "crop_or_species": "Timber shelterbelts (Teak, Mahogany) + border bamboo",
+                "area_hectares": timber_ha,
+                "area_acres": round(timber_ha * 2.471, 1),
+                "area_percent": round(timber_frac * 100, 0),
+                "purpose": "Long-term capital appreciation + windbreak",
+                "expected_cashflow_cycle": "Major harvest year 12–20; intermediate thinning possible",
+                "notes": "The 'hefty money after 10–20 yrs' component.",
+            },
+            {
+                "crop_or_species": "Understory legumes / stylo fodder + soil-building cover",
+                "area_hectares": under_ha,
+                "area_acres": round(under_ha * 2.471, 1),
+                "area_percent": round(under_frac * 100, 0),
+                "purpose": "Soil regeneration + minor fodder income",
+                "expected_cashflow_cycle": "Seasonal cut-and-carry fodder",
+                "notes": "Improves overall system resilience and fertility.",
+            },
+        ]
+        detailed = (
+            f"Balanced plan for {area_acre} acres and ~₹{budget:,.0f} budget aimed at both frequent income and long-term wealth: "
+            f"• {allocations[0]['area_acres']} acres → Amla/Moringa/Guava + legumes for cash every 4–6 months after year 2. "
+            f"• {allocations[1]['area_acres']} acres → Teak/Mahogany timber + bamboo borders for major capital gain in 12–20 years. "
+            f"• {allocations[2]['area_acres']} acres → understory legumes/fodder to keep soil healthy and add minor seasonal income. "
+            f"This allocation directly answers the classic 'money every 4 months + hefty long-term investment' requirement while matching local soil ({soil}) and water ({water}) conditions."
+        )
+        short_term = f"First meaningful cash expected from the fruit/cash block within 18–30 months; legumes can give earlier minor returns."
+        long_term = f"Timber block delivers the bulk of terminal value around year {horizon}; overall ROI target ~{template['roi_percent']}% with balanced risk."
+
+    return allocations, detailed, short_term, long_term
 
 
 def build_comparison_matrix(strategies: List[StrategyRecommendation], best: StrategyRecommendation) -> StrategyComparisonEngine:
@@ -451,22 +598,63 @@ def recommend(
     # 5. Nature Impact Score
     nature_impact = compute_nature_impact_score(land, greenscore)
 
-    # 5. Build Top 3 Strategies
+    # 5. Build Top 3 Strategies (rule-based with elaborate area allocations)
     strategies = [
         _build_strategy(StrategyType.MAX_CARBON, land),
         _build_strategy(StrategyType.MAX_ROI, land),
         _build_strategy(StrategyType.BALANCED, land),
     ]
 
+    # 5b. Optional Grok refinement — richer, context-aware plans when XAI_API_KEY is set
+    try:
+        from src.services.grok_advisor import refine_strategies_with_grok
+        base_for_grok = [
+            {
+                "strategy_type": s.strategy_type.value,
+                "title": s.title,
+                "approach": s.approach,
+                "species": s.recommended_species,
+                "area_allocations": s.area_allocations,
+                "detailed_plan": s.detailed_plan,
+            }
+            for s in strategies
+        ]
+        grok_enhanced = refine_strategies_with_grok(land, weights, base_for_grok)
+        if grok_enhanced:
+            type_map = {s.strategy_type.value: s for s in strategies}
+            for g in grok_enhanced:
+                st = g.get("strategy_type")
+                if st in type_map:
+                    target = type_map[st]
+                    if g.get("area_allocations"):
+                        target.area_allocations = g["area_allocations"]
+                    if g.get("detailed_plan"):
+                        target.detailed_plan = g["detailed_plan"]
+                    if g.get("short_term_income"):
+                        target.short_term_income = g["short_term_income"]
+                    if g.get("long_term_upside"):
+                        target.long_term_upside = g["long_term_upside"]
+                    if g.get("ai_recommendation_reason"):
+                        target.ai_recommendation_reason = g["ai_recommendation_reason"]
+                    if g.get("recommended_species"):
+                        target.recommended_species = g["recommended_species"]
+                    if g.get("title"):
+                        target.title = g["title"]
+                    if g.get("approach"):
+                        target.approach = g["approach"]
+    except Exception:
+        pass  # Never break the pipeline for optional AI enhancement
+
     # 6. Rank Strategies
     ranked = rank_strategies(strategies, weights)
     best = ranked[0]
 
-    # Assign reason to best
-    best.ai_recommendation_reason = (
-        f"Ranked #1 for your profile. Combines {best.approach} with projected {best.expected_roi_percent}% ROI "
-        f"and {best.carbon_potential_tco2e_per_ha} tCO₂e/ha/yr carbon sequestration."
-    )
+    # Assign reason to best (if Grok did not already set a richer one)
+    if not best.ai_recommendation_reason or "Ranked #1" in (best.ai_recommendation_reason or ""):
+        best.ai_recommendation_reason = (
+            f"Ranked #1 for your profile. Combines {best.approach} with projected {best.expected_roi_percent}% ROI "
+            f"and {best.carbon_potential_tco2e_per_ha} tCO₂e/ha/yr carbon sequestration."
+        )
 
     # 7. Carbon forecast with ranges
     forecasts = forecast_sequestration(

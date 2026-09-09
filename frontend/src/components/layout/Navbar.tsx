@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Menu, X, LogOut } from "lucide-react";
 import { useState } from "react";
@@ -20,8 +20,15 @@ const links = [
 
 export function Navbar() {
   const pathname = usePathname();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const { user, logout } = useAuth();
+
+  const handleLogout = () => {
+    logout();
+    setOpen(false);
+    router.push("/auth");
+  };
 
   return (
     <motion.header
@@ -72,7 +79,7 @@ export function Navbar() {
               </Link>
               <button
                 type="button"
-                onClick={logout}
+                onClick={handleLogout}
                 title="Sign out"
                 className="rounded-full p-2 text-olive-600 transition hover:bg-cream-200/60 hover:text-olive-900"
               >
@@ -133,10 +140,7 @@ export function Navbar() {
               </Link>
               <button
                 type="button"
-                onClick={() => {
-                  logout();
-                  setOpen(false);
-                }}
+                onClick={handleLogout}
                 className="mt-1 w-full rounded-full border border-olive-200 py-2.5 text-sm font-medium text-olive-800"
               >
                 Sign out

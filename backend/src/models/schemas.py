@@ -139,6 +139,11 @@ class StrategyRecommendation(BaseModel):
     rank_score: float = 0.0
     rank: int = 0
     ai_recommendation_reason: str = ""
+    # Enhanced elaborate strategy (area allocation, cashflow mix)
+    area_allocations: Optional[List[Dict[str, Any]]] = None
+    detailed_plan: Optional[str] = None
+    short_term_income: Optional[str] = None
+    long_term_upside: Optional[str] = None
 
 
 class CarbonForecast(BaseModel):
@@ -427,3 +432,81 @@ class DirectMessageItem(BaseModel):
     created_at: str
     is_read: int = 0
 
+
+
+# ------------------- Live Weather & Planting Window -------------------
+
+class DailyWeather(BaseModel):
+    date: str
+    temp_max_c: Optional[float] = None
+    temp_min_c: Optional[float] = None
+    precip_mm: Optional[float] = None
+    precip_probability_pct: Optional[float] = None
+    wind_max_kmh: Optional[float] = None
+    et0_mm: Optional[float] = None
+    soil_moisture: Optional[float] = None
+
+
+class WeatherSummary(BaseModel):
+    source: str
+    latitude: float
+    longitude: float
+    fetched_at: str
+    days: int
+    total_precip_mm: float
+    avg_temp_max_c: Optional[float] = None
+    avg_temp_min_c: Optional[float] = None
+    avg_soil_moisture: Optional[float] = None
+    heavy_rain_days: int = 0
+    dry_days: int = 0
+    note: Optional[str] = None
+
+
+class WeatherForecastResponse(BaseModel):
+    daily: List[DailyWeather]
+    summary: WeatherSummary
+    raw_error: Optional[str] = None
+
+
+class PlantingWindowResponse(BaseModel):
+    status: str  # plant_now | wait | caution
+    human_message: str
+    window_start: Optional[str] = None
+    window_end: Optional[str] = None
+    reasons: List[str] = []
+    good_days: List[str] = []
+    caution_days: List[str] = []
+    bad_days: List[str] = []
+    forecast_summary: Optional[WeatherSummary] = None
+    strategy: str
+    strategy_label: str
+    rules_applied: Optional[Dict[str, Any]] = None
+
+
+class WeatherAndWindowsResponse(BaseModel):
+    forecast: WeatherForecastResponse
+    planting_windows: Dict[str, PlantingWindowResponse]
+    overall_recommendation: Dict[str, Any]
+
+
+# Enhanced strategy detail for area allocation & mix
+class AreaAllocation(BaseModel):
+    crop_or_species: str
+    area_hectares: float
+    area_percent: float
+    purpose: str  # e.g. "short-cycle cash", "long-term timber", "soil building"
+    expected_cashflow_cycle: str  # e.g. "every 4 months", "year 8–20"
+    notes: Optional[str] = None
+
+
+class EnhancedStrategyDetail(BaseModel):
+    """Richer strategy description with explicit area splits."""
+    strategy_type: str
+    title: str
+    summary: str
+    allocations: List[AreaAllocation]
+    total_area_hectares: float
+    budget_fit_inr: float
+    short_term_income_note: str
+    long_term_investment_note: str
+    why_this_mix: str

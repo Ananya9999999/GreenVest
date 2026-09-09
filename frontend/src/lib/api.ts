@@ -9,9 +9,6 @@ import type {
   RealMarketplaceLand,
   DirectMessage,
   SubscriptionResponse,
-  PaymentOrderResponse,
-  VerifyPaymentResponse,
-  GeospatialEnrichResult,
 } from "@/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -355,33 +352,15 @@ export async function sendChatMessage(message: string, landId: string = "GV-2026
   }
 }
 
-export async function fetchSatelliteData(
-  landId: string = "GV-2026-001",
-  lat?: number,
-  lon?: number
-): Promise<SatelliteMonitoringData> {
+export async function fetchSatelliteData(landId: string = "GV-2026-001"): Promise<SatelliteMonitoringData> {
   try {
-    const params = new URLSearchParams();
-    if (landId) params.set("land_id", landId);
-    if (lat !== undefined) params.set("lat", lat.toString());
-    if (lon !== undefined) params.set("lon", lon.toString());
-    const query = params.toString() ? `?${params.toString()}` : "";
-    const res = await fetch(`${API_BASE}/api/satellite${query}`);
-    if (!res.ok) {
-      const res2 = await fetch(`${API_BASE}/api/satellite/${landId}`);
-      if (!res2.ok) throw new Error(`Satellite fetch error: ${res2.status}`);
-      return await res2.json();
-    }
+    const res = await fetch(`${API_BASE}/api/satellite/${landId}`);
+    if (!res.ok) throw new Error(`Satellite fetch error: ${res.status}`);
     return await res.json();
   } catch (err) {
     console.warn("Using fallback satellite data:", err);
-    const resolvedLat = lat || 19.9975;
-    const resolvedLon = lon || 73.7898;
     return {
       land_id: landId,
-      location: "Deccan Plateau, India",
-      latitude: resolvedLat,
-      longitude: resolvedLon,
       ndvi_current: 0.71,
       ndvi_baseline: 0.38,
       ndvi_trend_percent: 12.4,
@@ -445,14 +424,29 @@ export async function loginUser(payload: {
   email_or_user_id: string;
   password: string;
 }): Promise<UserProfile> {
-  const res = await fetch(`${API_BASE}/api/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
+  const body = {
+    email_or_user_id: payload.email_or_user_id.trim().replace(/^@/, ""),
+    password: payload.password,
+  };
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}/api/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    throw new Error(
+      "Cannot reach the server. Is the backend running on " + API_BASE + "?"
+    );
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: "Login failed" }));
-    throw new Error(err.detail || "Invalid credentials");
+    const detail = err.detail;
+    const msg = Array.isArray(detail)
+      ? detail.map((d: { msg?: string }) => d.msg || JSON.stringify(d)).join(", ")
+      : detail || "Invalid credentials";
+    throw new Error(typeof msg === "string" ? msg : "Invalid credentials");
   }
   return await res.json();
 }
@@ -465,21 +459,12 @@ export async function getUserProfile(userId: string): Promise<UserProfile> {
 
 // ------------------- Marketplace Lands -------------------
 
-export async function fetchMarketplaceLands(userId?: string): Promise<RealMarketplaceLand[]> {
+export async function fetchMarketplaceLands(): Promise<RealMarketplaceLand[]> {
   try {
-    const url = userId
-      ? `${API_BASE}/api/marketplace/lands?user_id=${encodeURIComponent(userId.replace(/^@/, ""))}`
-      : `${API_BASE}/api/marketplace/lands`;
-    const res = await fetch(url);
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ detail: "Failed to fetch lands" }));
-      throw new Error(err.detail || "Failed to fetch lands");
-    }
+    const res = await fetch(`${API_BASE}/api/marketplace/lands`);
+    if (!res.ok) throw new Error("Failed to fetch lands");
     return await res.json();
-  } catch (err: unknown) {
-    if (err instanceof Error && err.message.includes("Corporate Access Pass")) {
-      throw err;
-    }
+  } catch (err) {
     console.warn("Using fallback marketplace listings:", err);
     return [
       {
@@ -491,8 +476,6 @@ export async function fetchMarketplaceLands(userId?: string): Promise<RealMarket
         title: "Prime Deccan Black Soil Agroforestry Holding",
         location: "Nashik, MH",
         area_hectares: 12.5,
-        latitude: 19.9975,
-        longitude: 73.7898,
         soil_type: "Black soil",
         water_availability: "Moderate (Borewell & Aquifer)",
         asking_price_inr: 5250000.0,
@@ -510,8 +493,6 @@ export async function fetchMarketplaceLands(userId?: string): Promise<RealMarket
         title: "Western Ghats Foothills Red Loam Holding",
         location: "Coimbatore, TN",
         area_hectares: 8.0,
-        latitude: 11.0168,
-        longitude: 76.9558,
         soil_type: "Red loam",
         water_availability: "Moderate (Seasonal Rain & Well)",
         asking_price_inr: 3040000.0,
@@ -529,8 +510,6 @@ export async function fetchMarketplaceLands(userId?: string): Promise<RealMarket
         title: "Riverine High-Percolation Alluvial Land",
         location: "Pune rural, MH",
         area_hectares: 20.0,
-        latitude: 18.5204,
-        longitude: 73.8567,
         soil_type: "Alluvial",
         water_availability: "Abundant (Canal & High Water Table)",
         asking_price_inr: 10200000.0,
@@ -548,8 +527,6 @@ export async function fetchMarketplaceLands(userId?: string): Promise<RealMarket
         title: "Mysuru Sub-Tropical Agro-Ecological Plot",
         location: "Mysuru, KA",
         area_hectares: 6.2,
-        latitude: 12.2958,
-        longitude: 76.6394,
         soil_type: "Sandy loam",
         water_availability: "Rainfed / Constrained",
         asking_price_inr: 1984000.0,
@@ -562,60 +539,14 @@ export async function fetchMarketplaceLands(userId?: string): Promise<RealMarket
   }
 }
 
-export async function fetchGeospatialEnrich(
-  lat: number,
-  lon: number
-): Promise<GeospatialEnrichResult> {
-  try {
-    const res = await fetch(`${API_BASE}/api/geospatial/enrich?lat=${lat}&lon=${lon}`);
-    if (!res.ok) throw new Error(`Geospatial enrich status ${res.status}`);
-    return await res.json();
-  } catch (err) {
-    console.warn("Using offline geospatial fallback:", err);
-    return {
-      grid_cell: `${lat.toFixed(2)}_${lon.toFixed(2)}`,
-      latitude: lat,
-      longitude: lon,
-      soil_type: "Black Vertisol",
-      soil_texture: "Clay loam (Vertisol)",
-      soil_ph: 7.6,
-      organic_carbon_pct: 0.85,
-      clay_fraction: 48.0,
-      sand_fraction: 22.0,
-      silt_fraction: 30.0,
-      soil_suitability: "Exceptional for agroforestry and deep-rooting hardwoods",
-      distance_to_road_km: 0.8,
-      nearest_road_type: "State Highway / All-Weather Rural Road (MDR)",
-      distance_to_market_km: 5.4,
-      nearest_market_name: "Tehsil Agri Mandi / APMC Yard",
-      bhuvan_context: {
-        legal_use: "Permitted for visualization and educational research via ISRO Bhuvan Open WMS",
-        wms_capabilities_endpoint: "https://bhuvan-vec1.nrsc.gov.in/bhuvan/gwc/service/wms",
-        recommended_layers: [
-          { id: "lulc_50k", name: "Bhuvan Land Use / Land Cover (1:50,000)", authority: "ISRO/NRSC" },
-          { id: "cartosat_dem", name: "CartoDEM Digital Elevation Model", authority: "ISRO" },
-        ],
-        integration_note: "Bhuvan for visualization context + SoilGrids for soil attributes",
-      },
-      sources: ["SoilGrids v2.0 (ISRIC)", "OpenStreetMap Overpass", "ISRO Bhuvan Thematic"],
-      from_cache: false,
-      timestamp: new Date().toISOString(),
-    };
-  }
-}
-
 export async function createMarketplaceLand(payload: {
   owner_user_id: string;
   title: string;
   location: string;
   area_hectares: number;
-  soil_type?: string;
-  water_availability?: string;
+  soil_type: string;
+  water_availability: string;
   asking_price_inr: number;
-  latitude?: number;
-  longitude?: number;
-  distance_to_road_km?: number;
-  distance_to_market_km?: number;
 }): Promise<RealMarketplaceLand> {
   const res = await fetch(`${API_BASE}/api/marketplace/lands`, {
     method: "POST",
@@ -625,44 +556,6 @@ export async function createMarketplaceLand(payload: {
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: "Listing creation failed" }));
     throw new Error(err.detail || "Failed to create land listing");
-  }
-  return await res.json();
-}
-
-// ------------------- Real Razorpay Payments -------------------
-
-export async function createPaymentOrder(payload: {
-  user_id: string;
-  plan_type: "landowner_listing" | "corporate_access";
-  amount?: number;
-}): Promise<PaymentOrderResponse> {
-  const res = await fetch(`${API_BASE}/api/payments/create-order`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: "Failed to initialize payment order" }));
-    throw new Error(err.detail || "Failed to initialize payment order");
-  }
-  return await res.json();
-}
-
-export async function verifyPayment(payload: {
-  razorpay_order_id: string;
-  razorpay_payment_id: string;
-  razorpay_signature: string;
-  user_id: string;
-  plan_type: "landowner_listing" | "corporate_access";
-}): Promise<VerifyPaymentResponse> {
-  const res = await fetch(`${API_BASE}/api/payments/verify`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: "Payment verification failed" }));
-    throw new Error(err.detail || "Payment verification failed");
   }
   return await res.json();
 }
@@ -685,7 +578,6 @@ export async function subscribeToPlan(payload: {
   }
   return await res.json();
 }
-
 
 // ------------------- Direct User-to-User Messaging -------------------
 
