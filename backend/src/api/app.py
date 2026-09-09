@@ -167,10 +167,15 @@ def chat_assistant(req: ChatMessageRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/satellite")
 @app.get("/api/satellite/{land_id}")
-def satellite_data(land_id: str):
+def satellite_data(
+    land_id: Optional[str] = None,
+    lat: Optional[float] = None,
+    lon: Optional[float] = None,
+):
     try:
-        return get_satellite_monitoring_data(land_id)
+        return get_satellite_monitoring_data(land_id=land_id, latitude=lat, longitude=lon)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -266,6 +271,8 @@ def create_land(req: CreateLandRequest):
             soil_type=req.soil_type,
             water_availability=req.water_availability,
             asking_price_inr=req.asking_price_inr,
+            latitude=req.latitude,
+            longitude=req.longitude,
         )
         return new_land
     except HTTPException:

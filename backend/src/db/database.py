@@ -52,6 +52,8 @@ def init_db():
             title TEXT NOT NULL,
             location TEXT NOT NULL,
             area_hectares REAL NOT NULL,
+            latitude REAL,
+            longitude REAL,
             soil_type TEXT NOT NULL,
             water_availability TEXT NOT NULL,
             asking_price_inr REAL NOT NULL,
@@ -62,6 +64,29 @@ def init_db():
             FOREIGN KEY (owner_user_id) REFERENCES users (user_id)
         )
     """)
+
+    # Schema migration checks for existing databases
+    c.execute("PRAGMA table_info(lands)")
+    land_cols = [row[1] for row in c.fetchall()]
+    if "latitude" not in land_cols:
+        c.execute("ALTER TABLE lands ADD COLUMN latitude REAL")
+    if "longitude" not in land_cols:
+        c.execute("ALTER TABLE lands ADD COLUMN longitude REAL")
+
+    # Populate coordinates for seeded lands if missing
+    c.execute("UPDATE lands SET latitude = 19.9975, longitude = 73.7898 WHERE land_id = 'LAND-MH-84210' AND latitude IS NULL")
+    c.execute("UPDATE lands SET latitude = 11.0168, longitude = 76.9558 WHERE land_id = 'LAND-TN-39102' AND latitude IS NULL")
+    c.execute("UPDATE lands SET latitude = 18.5204, longitude = 73.8567 WHERE land_id = 'LAND-MH-93114' AND latitude IS NULL")
+    c.execute("UPDATE lands SET latitude = 12.2958, longitude = 76.6394 WHERE land_id = 'LAND-KA-48120' AND latitude IS NULL")
+    c.execute("UPDATE lands SET latitude = 22.7196, longitude = 75.8577 WHERE land_id = 'LAND-MP-59218' AND latitude IS NULL")
+    c.execute("UPDATE lands SET latitude = 17.9689, longitude = 79.5941 WHERE land_id = 'LAND-TS-67104' AND latitude IS NULL")
+    c.execute("UPDATE lands SET latitude = 19.9975, longitude = 73.7898 WHERE location LIKE '%Nashik%' AND latitude IS NULL")
+    c.execute("UPDATE lands SET latitude = 18.5204, longitude = 73.8567 WHERE location LIKE '%Pune%' AND latitude IS NULL")
+    c.execute("UPDATE lands SET latitude = 11.0168, longitude = 76.9558 WHERE location LIKE '%Coimbatore%' AND latitude IS NULL")
+    c.execute("UPDATE lands SET latitude = 12.2958, longitude = 76.6394 WHERE location LIKE '%Mysuru%' AND latitude IS NULL")
+    c.execute("UPDATE lands SET latitude = 22.7196, longitude = 75.8577 WHERE location LIKE '%Indore%' AND latitude IS NULL")
+    c.execute("UPDATE lands SET latitude = 17.9689, longitude = 79.5941 WHERE location LIKE '%Warangal%' AND latitude IS NULL")
+    c.execute("UPDATE lands SET latitude = 19.0760, longitude = 72.8777 WHERE latitude IS NULL")
 
     # 3. Subscriptions table
     c.execute("""
@@ -156,21 +181,21 @@ def _seed_real_data(conn: sqlite3.Connection):
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (uid, name, email, pw, utype, c_res["credit_score"], c_res["tier"], json.dumps(c_res["factors"]), sub, area, budget, now))
 
-    # Real lands with unique landid
+    # Real lands with unique landid and real coordinates
     lands = [
-        ("LAND-MH-84210", "nashik_organic_agro", "Prime Deccan Black Soil Agroforestry Parcel", "Nashik, MH", 12.5, "Black soil", "Moderate (Borewell & Aquifer)", 5250000.0, 84, 9.2),
-        ("LAND-TN-39102", "coimbatore_orchards", "Western Ghats Foothills Red Loam Holding", "Coimbatore, TN", 8.0, "Red loam", "Moderate (Seasonal Rain & Well)", 3040000.0, 76, 7.8),
-        ("LAND-MH-93114", "deccan_timber_trust", "Riverine High-Percolation Alluvial Land", "Pune rural, MH", 20.0, "Alluvial", "Abundant (Canal & High Water Table)", 10200000.0, 88, 9.5),
-        ("LAND-KA-48120", "deccan_timber_trust", "Mysuru Sub-Tropical Agro-Ecological Plot", "Mysuru, KA", 6.2, "Sandy loam", "Rainfed / Constrained", 1984000.0, 71, 6.5),
-        ("LAND-MP-59218", "nashik_organic_agro", "Malwa Plateau Deep Soil Plantation Zone", "Indore, MP", 15.0, "Black soil", "Moderate (Borewell)", 5850000.0, 79, 8.4),
-        ("LAND-TS-67104", "coimbatore_orchards", "Warangal Semi-Arid Carbon Restoration Plot", "Warangal, TS", 10.5, "Red soil", "Rainfed / Seasonal Tank", 3045000.0, 74, 7.1),
+        ("LAND-MH-84210", "nashik_organic_agro", "Prime Deccan Black Soil Agroforestry Parcel", "Nashik, MH", 12.5, 19.9975, 73.7898, "Black soil", "Moderate (Borewell & Aquifer)", 5250000.0, 84, 9.2),
+        ("LAND-TN-39102", "coimbatore_orchards", "Western Ghats Foothills Red Loam Holding", "Coimbatore, TN", 8.0, 11.0168, 76.9558, "Red loam", "Moderate (Seasonal Rain & Well)", 3040000.0, 76, 7.8),
+        ("LAND-MH-93114", "deccan_timber_trust", "Riverine High-Percolation Alluvial Land", "Pune rural, MH", 20.0, 18.5204, 73.8567, "Alluvial", "Abundant (Canal & High Water Table)", 10200000.0, 88, 9.5),
+        ("LAND-KA-48120", "deccan_timber_trust", "Mysuru Sub-Tropical Agro-Ecological Plot", "Mysuru, KA", 6.2, 12.2958, 76.6394, "Sandy loam", "Rainfed / Constrained", 1984000.0, 71, 6.5),
+        ("LAND-MP-59218", "nashik_organic_agro", "Malwa Plateau Deep Soil Plantation Zone", "Indore, MP", 15.0, 22.7196, 75.8577, "Black soil", "Moderate (Borewell)", 5850000.0, 79, 8.4),
+        ("LAND-TS-67104", "coimbatore_orchards", "Warangal Semi-Arid Carbon Restoration Plot", "Warangal, TS", 10.5, 17.9689, 79.5941, "Red soil", "Rainfed / Seasonal Tank", 3045000.0, 74, 7.1),
     ]
 
-    for lid, owner, title, loc, area, soil, water, price, health, carbon in lands:
+    for lid, owner, title, loc, area, lat, lon, soil, water, price, health, carbon in lands:
         c.execute("""
-            INSERT INTO lands (land_id, owner_user_id, title, location, area_hectares, soil_type, water_availability, asking_price_inr, land_health_score, carbon_potential, status, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)
-        """, (lid, owner, title, loc, area, soil, water, price, health, carbon, now))
+            INSERT INTO lands (land_id, owner_user_id, title, location, area_hectares, latitude, longitude, soil_type, water_availability, asking_price_inr, land_health_score, carbon_potential, status, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)
+        """, (lid, owner, title, loc, area, lat, lon, soil, water, price, health, carbon, now))
 
     # Real subscriptions
     c.execute("""
@@ -383,6 +408,8 @@ def create_land_listing(
     soil_type: str,
     water_availability: str,
     asking_price_inr: float,
+    latitude: Optional[float] = None,
+    longitude: Optional[float] = None,
 ) -> Dict[str, Any]:
     conn = get_db_connection()
     c = conn.cursor()
@@ -408,9 +435,9 @@ def create_land_listing(
     carbon_pot = round(min(9.8, max(6.0, 7.0 + (land_health / 40.0))), 1)
 
     c.execute("""
-        INSERT INTO lands (land_id, owner_user_id, title, location, area_hectares, soil_type, water_availability, asking_price_inr, land_health_score, carbon_potential, status, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)
-    """, (land_id, clean_uid, title, location, area_hectares, soil_type, water_availability, asking_price_inr, land_health, carbon_pot, now))
+        INSERT INTO lands (land_id, owner_user_id, title, location, area_hectares, latitude, longitude, soil_type, water_availability, asking_price_inr, land_health_score, carbon_potential, status, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)
+    """, (land_id, clean_uid, title, location, area_hectares, latitude, longitude, soil_type, water_availability, asking_price_inr, land_health, carbon_pot, now))
 
     # Update user's verified area in user table
     c.execute("""

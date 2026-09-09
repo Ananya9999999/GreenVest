@@ -27,6 +27,8 @@ class LandInput(BaseModel):
     land_id: str = "GV-2026-001"
     location: str = "Nashik, Maharashtra"
     area_hectares: float = 12.5
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
     soil_type: Optional[str] = "Black soil"
     water_availability: Optional[str] = "Moderate"
     budget: float = 500000.0
@@ -277,6 +279,8 @@ class MarketplaceLandItem(BaseModel):
     title: str
     location: str
     area_hectares: float
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
     soil_type: str
     water_availability: str
     asking_price_inr: float
@@ -291,6 +295,8 @@ class CreateLandRequest(BaseModel):
     title: str
     location: str
     area_hectares: float
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
     soil_type: str = "Black soil"
     water_availability: str = "Moderate"
     asking_price_inr: float = 2500000.0
