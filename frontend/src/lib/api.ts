@@ -459,84 +459,29 @@ export async function getUserProfile(userId: string): Promise<UserProfile> {
 
 // ------------------- Marketplace Lands -------------------
 
-export async function fetchMarketplaceLands(): Promise<RealMarketplaceLand[]> {
-  try {
-    const res = await fetch(`${API_BASE}/api/marketplace/lands`);
-    if (!res.ok) throw new Error("Failed to fetch lands");
-    return await res.json();
-  } catch (err) {
-    console.warn("Using fallback marketplace listings:", err);
-    return [
-      {
-        land_id: "LAND-MH-84210",
-        owner_user_id: "nashik_organic_agro",
-        owner_name: "Nashik Agro Holdings",
-        owner_credit_score: 840,
-        owner_credit_tier: "Prime Green A+",
-        title: "Prime Deccan Black Soil Agroforestry Holding",
-        location: "Nashik, MH",
-        area_hectares: 12.5,
-        soil_type: "Black soil",
-        water_availability: "Moderate (Borewell & Aquifer)",
-        asking_price_inr: 5250000.0,
-        land_health_score: 84,
-        carbon_potential: 9.2,
-        status: "active",
-        created_at: "2026-03-01",
-      },
-      {
-        land_id: "LAND-TN-39102",
-        owner_user_id: "coimbatore_orchards",
-        owner_name: "Coimbatore Eco Orchards",
-        owner_credit_score: 780,
-        owner_credit_tier: "Tier 1 Sustainable Sponsor",
-        title: "Western Ghats Foothills Red Loam Holding",
-        location: "Coimbatore, TN",
-        area_hectares: 8.0,
-        soil_type: "Red loam",
-        water_availability: "Moderate (Seasonal Rain & Well)",
-        asking_price_inr: 3040000.0,
-        land_health_score: 76,
-        carbon_potential: 7.8,
-        status: "active",
-        created_at: "2026-03-02",
-      },
-      {
-        land_id: "LAND-MH-93114",
-        owner_user_id: "deccan_timber_trust",
-        owner_name: "Deccan Timber Trust",
-        owner_credit_score: 880,
-        owner_credit_tier: "Prime Green A+",
-        title: "Riverine High-Percolation Alluvial Land",
-        location: "Pune rural, MH",
-        area_hectares: 20.0,
-        soil_type: "Alluvial",
-        water_availability: "Abundant (Canal & High Water Table)",
-        asking_price_inr: 10200000.0,
-        land_health_score: 88,
-        carbon_potential: 9.5,
-        status: "active",
-        created_at: "2026-03-03",
-      },
-      {
-        land_id: "LAND-KA-48120",
-        owner_user_id: "deccan_timber_trust",
-        owner_name: "Deccan Timber Trust",
-        owner_credit_score: 880,
-        owner_credit_tier: "Prime Green A+",
-        title: "Mysuru Sub-Tropical Agro-Ecological Plot",
-        location: "Mysuru, KA",
-        area_hectares: 6.2,
-        soil_type: "Sandy loam",
-        water_availability: "Rainfed / Constrained",
-        asking_price_inr: 1984000.0,
-        land_health_score: 71,
-        carbon_potential: 6.5,
-        status: "active",
-        created_at: "2026-03-04",
-      },
-    ];
+export async function fetchMarketplaceLands(
+  userId?: string
+): Promise<RealMarketplaceLand[]> {
+  if (!userId) {
+    throw new Error("Sign in required to access the marketplace.");
   }
+  const q = encodeURIComponent(userId.replace(/^@/, ""));
+  const res = await fetch(`${API_BASE}/api/marketplace/lands?user_id=${q}`);
+  if (res.status === 401 || res.status === 403) {
+    const err = await res.json().catch(() => ({
+      detail: "Marketplace access requires a paid subscription.",
+    }));
+    throw new Error(
+      typeof err.detail === "string"
+        ? err.detail
+        : "Marketplace access requires a paid subscription."
+    );
+  }
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Failed to fetch lands" }));
+    throw new Error(err.detail || "Failed to fetch lands");
+  }
+  return await res.json();
 }
 
 export async function createMarketplaceLand(payload: {
@@ -567,14 +512,30 @@ export async function subscribeToPlan(payload: {
   plan_type: "landowner_listing" | "corporate_access";
   amount_paid: number;
 }): Promise<SubscriptionResponse> {
-  const res = await fetch(`${API_BASE}/api/subscription/subscribe`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
+  const body = {
+    user_id: payload.user_id.replace(/^@/, "").trim().toLowerCase(),
+    plan_type: payload.plan_type,
+    amount_paid: payload.amount_paid,
+  };
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}/api/subscription/subscribe`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    throw new Error(
+      `Cannot reach API at ${API_BASE}. Start the backend (uvicorn on the same port as NEXT_PUBLIC_API_URL).`
+    );
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: "Subscription failed" }));
-    throw new Error(err.detail || "Subscription failed");
+    const detail = err.detail;
+    const msg = Array.isArray(detail)
+      ? detail.map((d: { msg?: string }) => d.msg || JSON.stringify(d)).join(", ")
+      : detail || `Subscription failed (${res.status})`;
+    throw new Error(typeof msg === "string" ? msg : "Subscription failed");
   }
   return await res.json();
 }

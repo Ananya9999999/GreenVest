@@ -63,6 +63,7 @@ function AnalyzeContent() {
   // 3. Advisor analysis data
   const [data, setData] = useState<AdvisorResult | null>(null);
   const [loading, setLoading] = useState(true);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [selectedStrategy, setSelectedStrategy] = useState<StrategyRecommendation | null>(null);
 
   // 4. "What If?" Scenario Simulator state
@@ -112,17 +113,27 @@ function AnalyzeContent() {
   const runFetchAnalysis = useCallback(
     async (currentWeights: PreferenceWeights) => {
       setLoading(true);
+      setAnalysisError(null);
       try {
         const result = await analyzeLand({
           land: landInput,
           weights: currentWeights,
         });
+        if (!result?.strategies?.length) {
+          throw new Error("No strategies returned. Is the backend /api/analyze running?");
+        }
         setData(result);
         if (!selectedStrategy || !result.strategies.some((s) => s.strategy_type === selectedStrategy.strategy_type)) {
           setSelectedStrategy(result.best_match);
         }
       } catch (err) {
         console.error("Error analyzing land:", err);
+        setAnalysisError(
+          err instanceof Error
+            ? err.message
+            : "Strategy analysis failed. Check backend and NEXT_PUBLIC_API_URL."
+        );
+        setData(null);
       } finally {
         setLoading(false);
       }
@@ -707,6 +718,14 @@ function AnalyzeContent() {
           </div>
 
           <div className="mt-6 grid gap-6 lg:grid-cols-3">
+            {analysisError && (
+              <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                <strong>Strategies could not run.</strong> {analysisError}
+                <p className="mt-1 text-xs text-red-600">
+                  Start backend: <code>uvicorn src.api.app:app --reload --port 8000</code>
+                </p>
+              </div>
+            )}
             {data?.strategies.map((strategy) => {
               const isSelected = activeStrategy?.strategy_type === strategy.strategy_type;
               return (

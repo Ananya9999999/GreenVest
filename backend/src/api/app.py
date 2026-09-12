@@ -240,9 +240,26 @@ def get_profile(user_id: str):
 # ------------------- Marketplace Lands -------------------
 
 @app.get("/api/marketplace/lands", response_model=List[MarketplaceLandItem])
-def list_marketplace_lands():
+def list_marketplace_lands(user_id: Optional[str] = None):
+    """Marketplace browse is paid-only (landowner_listing or corporate_access)."""
     try:
+        if not user_id or not str(user_id).strip():
+            raise HTTPException(
+                status_code=401,
+                detail="Sign in required to access the marketplace.",
+            )
+        user = get_user_by_id(str(user_id).strip().lstrip("@"))
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found.")
+        tier = (user.get("subscription_tier") or "free").lower()
+        if tier == "free":
+            raise HTTPException(
+                status_code=403,
+                detail="Marketplace access requires an active paid subscription (Landowner Listing or Corporate Access).",
+            )
         return get_marketplace_lands()
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -283,26 +300,44 @@ def create_land(req: CreateLandRequest):
 @app.post("/api/subscription/subscribe", response_model=SubscriptionResponse)
 def activate_subscription(req: SubscriptionRequest):
     try:
-        user = get_user_by_id(req.user_id)
+        uid = (req.user_id or "").strip().lstrip("@").lower()
+        if not uid:
+            raise HTTPException(status_code=400, detail="user_id is required.")
+        plan = (req.plan_type or "").strip()
+        if plan not in ("landowner_listing", "corporate_access"):
+            raise HTTPException(
+                status_code=400,
+                detail="plan_type must be landowner_listing or corporate_access.",
+            )
+
+        user = get_user_by_id(uid)
         if not user:
-            raise HTTPException(status_code=404, detail=f"User @{req.user_id} not found.")
+            raise HTTPException(status_code=404, detail=f"User @{uid} not found. Sign in again.")
 
         updated = update_subscription(
-            user_id=req.user_id,
-            plan_type=req.plan_type,
-            amount_paid=req.amount_paid,
+            user_id=uid,
+            plan_type=plan,
+            amount_paid=float(req.amount_paid or 0),
         )
+        if not updated:
+            raise HTTPException(status_code=500, detail="Subscription update returned empty user.")
 
-        plan_name = "Landowner Listing Pro" if req.plan_type == "landowner_listing" else "Corporate Marketplace Pass"
+        plan_name = (
+            "Landowner Listing Pro"
+            if plan == "landowner_listing"
+            else "Corporate Marketplace Pass"
+        )
         return SubscriptionResponse(
             user_id=updated["user_id"],
             subscription_tier=updated["subscription_tier"],
-            credit_score=updated["credit_score"],
+            credit_score=int(updated["credit_score"]),
             credit_tier=updated["credit_tier"],
-            message=f"Successfully upgraded to {plan_name}. Credit score increased to {updated['credit_score']}!"
+            message=f"Successfully upgraded to {plan_name}. Credit score is now {updated['credit_score']}.",
         )
     except HTTPException:
         raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
